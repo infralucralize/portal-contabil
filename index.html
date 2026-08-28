@@ -236,6 +236,7 @@ label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4p
     <div class="modal-content">
       <div class="modal-header"><h5 class="modal-title">Lançamento Manual</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
+        <input type="hidden" id="mlId">
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">Empresa *</label>
@@ -1394,7 +1395,7 @@ function renderLanc(){
   const empOpts='<option value="">Todas</option>'+DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
   return`
   <div class="ph"><div><h2>📄 Lançamentos Contábeis</h2><p>Todos os lançamentos registrados</p></div>
-    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#mLanc"><i class="bi bi-plus-lg me-1"></i>Lançamento Manual</button>
+    <button class="btn btn-primary btn-sm" onclick="openLancModal(null)"><i class="bi bi-plus-lg me-1"></i>Lançamento Manual</button>
   </div>
   <div class="sc mb-3">
     <div class="row g-2 align-items-end">
@@ -1450,7 +1451,10 @@ function renderLancTable(){
         <td><small>${l.doc||'-'}</small></td>
         <td><span class="badge bg-light text-muted">${l.origem||'-'}</span></td>
         <td>${l.conciliado?'<span class="badge bg-success">Sim</span>':'<span class="badge bg-warning text-dark">Não</span>'}</td>
-        <td><button class="btn btn-xs btn-outline-danger" style="padding:1px 5px;font-size:.7rem" onclick="delLanc('${l.id}')"><i class="bi bi-trash"></i></button></td>
+        <td>
+          <button class="btn btn-xs btn-outline-secondary me-1" style="padding:1px 5px;font-size:.7rem" onclick="openLancModal('${l.id}')"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-xs btn-outline-danger" style="padding:1px 5px;font-size:.7rem" onclick="delLanc('${l.id}')"><i class="bi bi-trash"></i></button>
+        </td>
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
@@ -1469,6 +1473,24 @@ function initLancModal(){
   document.getElementById('mlData').value=today;
 }
 
+function openLancModal(id){
+  const l=id?DB.lancamentos.find(x=>x.id===id):null;
+  document.getElementById('mlId').value=id||'';
+  document.getElementById('mlEmp').value=l?l.empId:'';
+  loadLancContas();
+  document.getElementById('mlBanco').value=l?(l.bancoId||''):'';
+  document.getElementById('mlData').value=l?l.data:new Date().toISOString().slice(0,10);
+  document.getElementById('mlDebito').value=l?l.contaD:'';
+  document.getElementById('mlCredito').value=l?l.contaC:'';
+  document.getElementById('mlValor').value=l?l.valor:'';
+  document.getElementById('mlCodH').value=l?(l.codHist||''):'';
+  document.getElementById('mlHist').value=l?(l.hist||''):'';
+  document.getElementById('mlDoc').value=l?(l.doc||''):'';
+  document.getElementById('mlOrigem').value=l?(l.origem||'Manual'):'Manual';
+  document.querySelector('#mLanc .modal-title').textContent=id?'Editar Lançamento':'Lançamento Manual';
+  new bootstrap.Modal(document.getElementById('mLanc')).show();
+}
+
 function loadLancContas(){
   const empId=document.getElementById('mlEmp').value;
   const bancSel=document.getElementById('mlBanco');
@@ -1482,6 +1504,7 @@ function loadLancContas(){
 }
 
 async function saveLanc(){
+  const editId=document.getElementById('mlId').value;
   const empId=document.getElementById('mlEmp').value;
   const data=document.getElementById('mlData').value;
   const contaD=document.getElementById('mlDebito').value;
@@ -1490,20 +1513,28 @@ async function saveLanc(){
   if(!empId||!data||!contaD||!contaC||isNaN(valor)||valor<=0){
     toast('Preencha todos os campos obrigatórios','danger');return;
   }
-  const novo={
-    id:uid(),empId,bancoId:document.getElementById('mlBanco').value||null,
+  const campos={
+    empId,bancoId:document.getElementById('mlBanco').value||null,
     data,contaD,contaC,valor,
     hist:document.getElementById('mlHist').value,
     codHist:document.getElementById('mlCodH').value,
     doc:document.getElementById('mlDoc').value,
-    origem:document.getElementById('mlOrigem').value,
-    conciliado:false
+    origem:document.getElementById('mlOrigem').value
   };
-  try{ await xlAddRow('Lancamentos', lancToRow(novo)); }
-  catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
-  DB.lancamentos.push(novo);
+  try{
+    if(editId){
+      const l=DB.lancamentos.find(x=>x.id===editId);
+      if(!l){toast('Lançamento não encontrado','danger');return;}
+      Object.assign(l,campos);
+      await xlUpdateRowById('Lancamentos', editId, lancToRow(l));
+    } else {
+      const novo={id:uid(),...campos,conciliado:false};
+      await xlAddRow('Lancamentos', lancToRow(novo));
+      DB.lancamentos.push(novo);
+    }
+  } catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   bootstrap.Modal.getInstance(document.getElementById('mLanc'))?.hide();
-  toast('Lançamento registrado!');
+  toast(editId?'Lançamento atualizado!':'Lançamento registrado!');
   if(_view==='lanc') renderLancTable();
 }
 
