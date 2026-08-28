@@ -307,14 +307,14 @@ label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4p
 // pelo central-triagem (login delegado, mesmo tenant).
 // ============================================================
 const SP_CONFIG = {
-  clientId: "0876f783-54bf-4149-8ce3-4d72d4b5af94",
+  clientId: "05521d3b-877a-4c53-a594-808878d6a469",
   tenantId: "5173aa83-66e1-49f3-9128-f2251b43294d",
   hostname: "lucralize.sharepoint.com",
   driveName: "Operacional",
   workbookPath: "PI - PROCESSOS E INFRA/AUTOMAÇÕES CLAUDE/portal-contabil/PortalContabil.xlsx",
   extratosFolder: "PI - PROCESSOS E INFRA/AUTOMAÇÕES CLAUDE/portal-contabil/Extratos Importados"
 };
-const GRAPH_SCOPES = ["Sites.ReadWrite.All","Files.ReadWrite.All","User.Read"];
+const GRAPH_SCOPES = ["Sites.ReadWrite.All","User.Read"];
 let _msal=null, _token=null, _driveId=null, _wbItemId=null;
 
 function encPath(p){ return p.split('/').map(encodeURIComponent).join('/'); }
