@@ -310,7 +310,7 @@ const SP_CONFIG = {
   clientId: "05521d3b-877a-4c53-a594-808878d6a469",
   tenantId: "5173aa83-66e1-49f3-9128-f2251b43294d",
   hostname: "lucralize.sharepoint.com",
-  driveName: "Operacional",
+  driveId: "b!ekISGx37FUa8VJQoVDwcqosBcJf3ciVJhg2HmW7OU_Skpx_nvEGVTIcQ4XWlDxbZ",
   workbookPath: "PI - PROCESSOS E INFRA/AUTOMAÇÕES CLAUDE/portal-contabil/PortalContabil.xlsx",
   extratosFolder: "PI - PROCESSOS E INFRA/AUTOMAÇÕES CLAUDE/portal-contabil/Extratos Importados"
 };
@@ -363,11 +363,7 @@ async function graphRaw(method, path, arrayBuffer, contentType){
 
 async function resolveWorkbook(){
   if(_wbItemId) return;
-  const site = await graph('GET', `/sites/${SP_CONFIG.hostname}`);
-  const drives = await graph('GET', `/sites/${site.id}/drives?$select=id,name`);
-  const drive = (drives.value||[]).find(d=>d.name===SP_CONFIG.driveName);
-  if(!drive) throw new Error(`Biblioteca "${SP_CONFIG.driveName}" não encontrada no site`);
-  _driveId = drive.id;
+  _driveId = SP_CONFIG.driveId;
   const item = await graph('GET', `/drives/${_driveId}/root:/${encPath(SP_CONFIG.workbookPath)}`);
   _wbItemId = item.id;
 }
