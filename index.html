@@ -1031,8 +1031,7 @@ function renderEmpresas(){
           <td><span class="${e.isNova?'tag-novo':'tag-exist'}">${e.isNova?'Cliente Novo':'Cliente Existente'}</span></td>
           <td><span class="badge bg-info text-dark">${bcs.length}</span></td>
           <td>
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="go('emp-det',{id:'${e.id}'})"><i class="bi bi-eye"></i></button>
-            <button class="btn btn-sm btn-outline-secondary me-1" onclick="go('emp-form',{id:'${e.id}'})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="go('emp-det',{id:'${e.id}'})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="delEmp('${e.id}')"><i class="bi bi-trash"></i></button>
           </td>
         </tr>`;
