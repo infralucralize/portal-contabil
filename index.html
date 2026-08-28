@@ -1,0 +1,2204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lucralize | Lançamentos Contábeis</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.3/font/bootstrap-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/msal/2.38.3/msal-browser.min.js"></script>
+<style>
+:root{--sb:#1a2332;--sb2:#243447;--pr:#2563eb;--pr2:#1d4ed8;--ok:#10b981;--wn:#f59e0b;--er:#ef4444;--bg:#f1f5f9;--bd:#e2e8f0}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#1e293b}
+#sb{width:230px;min-height:100vh;background:var(--sb);position:fixed;left:0;top:0;z-index:100;display:flex;flex-direction:column;overflow-y:auto}
+#sb .logo{padding:18px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+#sb .logo h5{color:#fff;margin:0;font-weight:700;font-size:1rem;display:flex;align-items:center;gap:8px}
+#sb .logo p{color:rgba(255,255,255,.45);margin:2px 0 0;font-size:.72rem}
+#sb nav{flex:1;padding:8px 0}
+.ns{padding:10px 16px 3px;color:rgba(255,255,255,.35);font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.ni{display:flex;align-items:center;padding:8px 16px;color:rgba(255,255,255,.65);cursor:pointer;transition:all .15s;font-size:.83rem;gap:9px;text-decoration:none;border:none;background:none;width:100%;text-align:left}
+.ni:hover{background:rgba(255,255,255,.07);color:#fff}
+.ni.active{background:var(--pr);color:#fff}
+.ni i{width:17px;font-size:.95rem;flex-shrink:0}
+#main{margin-left:230px;min-height:100vh;padding:22px}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid var(--bd)}
+.ph h2{margin:0;font-size:1.35rem;font-weight:700}
+.ph p{margin:2px 0 0;color:#64748b;font-size:.82rem}
+.card{background:#fff;border-radius:10px;border:1px solid var(--bd);box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.sc{background:#fff;border-radius:10px;border:1px solid var(--bd);padding:18px}
+.sc h6{font-weight:600;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bd);color:#1e293b;font-size:.9rem}
+.dt{background:#fff;border-radius:10px;border:1px solid var(--bd);overflow:hidden}
+.dth{padding:14px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.dth h5{margin:0;font-weight:600;font-size:.95rem}
+.dt table{margin:0}
+.dt table th{background:#f8fafc;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:700;padding:9px 14px}
+.dt table td{padding:10px 14px;vertical-align:middle;font-size:.83rem}
+.dt table tr:last-child td{border-bottom:none}
+.uz{border:2px dashed var(--bd);border-radius:10px;padding:36px;text-align:center;cursor:pointer;transition:all .2s}
+.uz:hover,.uz.drag-over{border-color:var(--pr);background:#eff6ff}
+.uz i{font-size:2rem;color:#94a3b8}
+.uz p{margin:6px 0 0;color:#64748b;font-size:.85rem}
+.stat-card{background:#fff;border-radius:10px;border:1px solid var(--bd);padding:18px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.stat-icon{width:44px;height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.35rem;margin-bottom:10px}
+.stat-card h3{font-size:1.65rem;font-weight:700;margin:0}
+.stat-card p{margin:2px 0 0;color:#64748b;font-size:.8rem}
+.badge-D{background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700}
+.badge-C{background:#d1fae5;color:#065f46;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:700}
+.vd{color:var(--er);font-weight:600}
+.vc{color:var(--ok);font-weight:600}
+.alert-unid{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:14px;margin-bottom:14px}
+.tree-row{display:flex;align-items:center;padding:4px 0;font-size:.82rem}
+.tree-row.l4{font-weight:600}
+.blink{animation:blink .8s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.tag-novo{background:#dcfce7;color:#166534;padding:1px 8px;border-radius:20px;font-size:.7rem;font-weight:700}
+.tag-exist{background:#e0e7ff;color:#3730a3;padding:1px 8px;border-radius:20px;font-size:.7rem;font-weight:700}
+.tag-banco{background:#f0f9ff;color:#0369a1;border:1px solid #bae6fd;border-radius:6px;padding:4px 10px;font-size:.75rem;display:inline-flex;align-items:center;gap:5px}
+.progress-bar-striped{background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.15) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.15) 50%,rgba(255,255,255,.15) 75%,transparent 75%,transparent)}
+select.form-select,input.form-control,textarea.form-control{font-size:.85rem}
+label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4px}
+.btn{font-size:.83rem}
+.btn-sm{font-size:.78rem}
+.empty-state{padding:40px;text-align:center;color:#94a3b8}
+.empty-state .icon{font-size:2.5rem;margin-bottom:10px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN GATE -->
+<div id="login-gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0d1b2a,#1a2332);display:flex;align-items:center;justify-content:center;">
+  <div style="text-align:center;max-width:340px;padding:32px;">
+    <h4 style="color:#fff;margin-bottom:4px">📊 Lucralize</h4>
+    <p style="color:rgba(255,255,255,.55);font-size:.85rem;margin-bottom:24px">Lançamentos Contábeis</p>
+    <button id="login-gate-btn" onclick="gateLogin()" style="width:100%;padding:12px 16px;background:#2563eb;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">Entrar com conta Lucralize</button>
+    <div id="login-gate-status" style="margin-top:14px;font-size:12px;color:#9ca3af;"></div>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div id="sb">
+  <div class="logo">
+    <h5>📊 Lucralize</h5>
+    <p>Lançamentos Contábeis</p>
+  </div>
+  <nav>
+    <div class="ns">Geral</div>
+    <button class="ni active" onclick="go('dash')"><i class="bi bi-speedometer2"></i>Dashboard</button>
+    <div class="ns">Configuração</div>
+    <button class="ni" onclick="go('plano')"><i class="bi bi-diagram-3"></i>Plano de Contas</button>
+    <button class="ni" onclick="go('empresas')"><i class="bi bi-building"></i>Empresas</button>
+    <div class="ns">Operações</div>
+    <button class="ni" onclick="go('import')"><i class="bi bi-cloud-upload"></i>Importação</button>
+    <button class="ni" onclick="go('lanc')"><i class="bi bi-journal-text"></i>Lançamentos</button>
+    <button class="ni" onclick="go('concil')"><i class="bi bi-check2-square"></i>Conciliação</button>
+    <div class="ns">Histórico</div>
+    <button class="ni" onclick="go('razao')"><i class="bi bi-book"></i>Razão / Aprendizado</button>
+    <div class="ns">Exportação</div>
+    <button class="ni" onclick="go('export')"><i class="bi bi-file-earmark-arrow-down"></i>Exportar Domínio</button>
+  </nav>
+  <div style="padding:10px 14px;border-top:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.3);font-size:.65rem">v1.0 © Lucralize 2026</div>
+</div>
+
+<!-- MAIN -->
+<div id="main"><div id="pg"></div></div>
+
+<!-- MODAL: Classificar lançamento não identificado -->
+<div class="modal fade" id="mClass" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header" style="background:#fff7ed;border-bottom:1px solid #fed7aa">
+        <h5 class="modal-title"><i class="bi bi-exclamation-triangle text-warning me-2"></i>Classificar Lançamento Não Identificado</h5>
+        <span id="mClassCount" class="badge bg-warning text-dark ms-2"></span>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-warning py-2 mb-3">
+          <small>Este lançamento não pôde ser classificado automaticamente. Selecione as contas e histórico.</small>
+        </div>
+        <div id="mClassInfo" class="sc mb-3 py-3" style="background:#f8fafc"></div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Conta Débito *</label>
+            <select id="mcDebito" class="form-select"></select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Conta Crédito *</label>
+            <select id="mcCredito" class="form-select"></select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Cód. Histórico</label>
+            <input type="number" id="mcCodHist" class="form-control" placeholder="Ex: 114">
+          </div>
+          <div class="col-md-9">
+            <label class="form-label">Histórico Complementar</label>
+            <input type="text" id="mcHist" class="form-control" placeholder="Descrição do lançamento">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Nº Documento</label>
+            <input type="text" id="mcDoc" class="form-control" placeholder="NF / DOC">
+          </div>
+          <div class="col-md-6 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="mcSalvar" checked>
+              <label class="form-check-label" for="mcSalvar" style="font-size:.82rem">Salvar como regra automática</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary btn-sm" onclick="skipClass()">Pular</button>
+        <button class="btn btn-primary btn-sm" onclick="saveClass()"><i class="bi bi-check-lg me-1"></i>Salvar e Próximo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Conta (plano de contas) -->
+<div class="modal fade" id="mConta" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="mContaTit">Conta</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="mcIdx">
+        <div class="row g-3">
+          <div class="col-4"><label class="form-label">Código *</label><input type="text" id="mcCod" class="form-control" placeholder="1.1.1.001"></div>
+          <div class="col-8"><label class="form-label">Nome *</label><input type="text" id="mcNome" class="form-control" placeholder="Caixa Geral"></div>
+          <div class="col-4"><label class="form-label">Tipo *</label>
+            <select id="mcTipo" class="form-select">
+              <option>Ativo</option><option>Passivo</option><option>PL</option>
+              <option>Receita</option><option>Despesa</option><option>Custos</option>
+            </select>
+          </div>
+          <div class="col-4"><label class="form-label">Natureza *</label>
+            <select id="mcNat" class="form-select"><option value="D">Devedora (D)</option><option value="C">Credora (C)</option></select>
+          </div>
+          <div class="col-4"><label class="form-label">Nível</label>
+            <select id="mcNiv" class="form-select">
+              <option value="1">1-Grupo</option><option value="2">2-Subgrupo</option>
+              <option value="3">3-Elemento</option><option value="4" selected>4-Analítica</option>
+            </select>
+          </div>
+          <div class="col-8"><label class="form-label">Histórico Padrão</label><input type="text" id="mcHP" class="form-control" placeholder="Ex: Movimentação bancária"></div>
+          <div class="col-4"><label class="form-label">Cód. Histórico</label><input type="number" id="mcCH" class="form-control" placeholder="2"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveConta()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Banco -->
+<div class="modal fade" id="mBanco" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title" id="mBancoTit">Banco</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="mbEmpId"><input type="hidden" id="mbId">
+        <div class="row g-3">
+          <div class="col-6"><label class="form-label">Banco *</label>
+            <select id="mbBanco" class="form-select">
+              <option value="">Selecione...</option>
+              <option>001 - Banco do Brasil</option><option>033 - Santander</option>
+              <option>104 - Caixa Econômica Federal</option><option>237 - Bradesco</option>
+              <option>341 - Itaú Unibanco</option><option>260 - Nubank</option>
+              <option>077 - Inter</option><option>336 - C6 Bank</option><option>Outro</option>
+            </select>
+          </div>
+          <div class="col-6"><label class="form-label">Apelido *</label><input type="text" id="mbApel" class="form-control" placeholder="Ex: Conta Principal BB"></div>
+          <div class="col-4"><label class="form-label">Agência</label><input type="text" id="mbAg" class="form-control" placeholder="0001"></div>
+          <div class="col-5"><label class="form-label">Conta</label><input type="text" id="mbCta" class="form-control" placeholder="12345-6"></div>
+          <div class="col-3"><label class="form-label">Tipo</label>
+            <select id="mbTipo" class="form-select"><option value="CC">Corrente</option><option value="CP">Poupança</option><option value="CI">Investimento</option></select>
+          </div>
+          <div class="col-12"><label class="form-label">Conta Contábil (Plano de Contas)</label>
+            <select id="mbContabil" class="form-select"><option value="">Selecione...</option></select>
+          </div>
+          <div class="col-6"><label class="form-label">Saldo Inicial (R$)</label><input type="number" id="mbSaldo" class="form-control" placeholder="0,00" step="0.01"></div>
+          <div class="col-6"><label class="form-label">Data Saldo Inicial</label><input type="date" id="mbDataSaldo" class="form-control"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveBanco()">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Lançamento Manual -->
+<div class="modal fade" id="mLanc" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Lançamento Manual</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Empresa *</label>
+            <select id="mlEmp" class="form-select" onchange="loadLancContas()"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Banco</label>
+            <select id="mlBanco" class="form-select"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Data *</label>
+            <input type="date" id="mlData" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Conta Débito *</label>
+            <select id="mlDebito" class="form-select"></select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Conta Crédito *</label>
+            <select id="mlCredito" class="form-select"></select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Valor (R$) *</label>
+            <input type="number" id="mlValor" class="form-control" step="0.01" placeholder="0,00">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Cód. Histórico</label>
+            <input type="number" id="mlCodH" class="form-control" placeholder="Ex: 90">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Histórico Complementar</label>
+            <input type="text" id="mlHist" class="form-control" placeholder="Descrição">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Nº Documento</label>
+            <input type="text" id="mlDoc" class="form-control" placeholder="NF / DOC">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Origem</label>
+            <select id="mlOrigem" class="form-select">
+              <option value="Manual">Manual</option><option value="NF">Nota Fiscal</option>
+              <option value="Boleto">Boleto</option><option value="TED/PIX">TED/PIX</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-primary btn-sm" onclick="saveLanc()"><i class="bi bi-check-lg me-1"></i>Salvar Lançamento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="tst" class="toast align-items-center border-0" role="alert">
+    <div class="d-flex"><div class="toast-body" id="tstMsg"></div>
+    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+<script>
+// ============================================================
+// GRAPH / EXCEL INTEGRATION (Portal Contábil)
+// Fonte de dados: PortalContabil.xlsx numa biblioteca do SharePoint,
+// com uma Tabela do Excel por entidade. Reaproveita o app já usado
+// pelo central-triagem (login delegado, mesmo tenant).
+// ============================================================
+const SP_CONFIG = {
+  clientId: "0876f783-54bf-4149-8ce3-4d72d4b5af94",
+  tenantId: "5173aa83-66e1-49f3-9128-f2251b43294d",
+  hostname: "lucralize.sharepoint.com",
+  driveName: "Operacional",
+  workbookPath: "PI - PROCESSOS E INFRA/AUTOMAÇÕES CLAUDE/portal-contabil/PortalContabil.xlsx",
+  extratosFolder: "PI - PROCESSOS E INFRA/AUTOMAÇÕES CLAUDE/portal-contabil/Extratos Importados"
+};
+const GRAPH_SCOPES = ["Sites.ReadWrite.All","Files.ReadWrite.All","User.Read"];
+let _msal=null, _token=null, _driveId=null, _wbItemId=null;
+
+function encPath(p){ return p.split('/').map(encodeURIComponent).join('/'); }
+
+async function ensureMsal(){
+  if(_msal) return _msal;
+  _msal = new msal.PublicClientApplication({
+    auth:{clientId:SP_CONFIG.clientId, authority:`https://login.microsoftonline.com/${SP_CONFIG.tenantId}`, redirectUri:window.location.origin+window.location.pathname},
+    cache:{cacheLocation:'localStorage'}
+  });
+  await _msal.initialize();
+  return _msal;
+}
+
+async function graphLoginInteractive(){
+  await ensureMsal();
+  const result = await _msal.loginPopup({scopes:GRAPH_SCOPES});
+  _token = result.accessToken;
+  return result;
+}
+
+async function graphLoginSilent(){
+  await ensureMsal();
+  const accounts = _msal.getAllAccounts();
+  if(!accounts.length) throw new Error('sem-conta');
+  const result = await _msal.acquireTokenSilent({scopes:GRAPH_SCOPES, account:accounts[0]});
+  _token = result.accessToken;
+  return result;
+}
+
+async function graph(method, path, body, extraHeaders){
+  const headers = Object.assign({'Authorization':'Bearer '+_token,'Content-Type':'application/json'}, extraHeaders||{});
+  const opts = {method, headers};
+  if(body!==undefined) opts.body = typeof body==='string' ? body : JSON.stringify(body);
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, opts);
+  if(!res.ok){ const t=await res.text(); throw new Error(`Graph ${method} ${path} -> ${res.status}: ${t}`); }
+  if(res.status===204) return null;
+  return res.json();
+}
+
+async function graphRaw(method, path, arrayBuffer, contentType){
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, {method, headers:{'Authorization':'Bearer '+_token,'Content-Type':contentType||'application/octet-stream'}, body:arrayBuffer});
+  if(!res.ok){ const t=await res.text(); throw new Error(`Graph ${method} ${path} -> ${res.status}: ${t}`); }
+  return res.json();
+}
+
+async function resolveWorkbook(){
+  if(_wbItemId) return;
+  const site = await graph('GET', `/sites/${SP_CONFIG.hostname}`);
+  const drives = await graph('GET', `/sites/${site.id}/drives?$select=id,name`);
+  const drive = (drives.value||[]).find(d=>d.name===SP_CONFIG.driveName);
+  if(!drive) throw new Error(`Biblioteca "${SP_CONFIG.driveName}" não encontrada no site`);
+  _driveId = drive.id;
+  const item = await graph('GET', `/drives/${_driveId}/root:/${encPath(SP_CONFIG.workbookPath)}`);
+  _wbItemId = item.id;
+}
+
+const TABLE_HEADERS = {
+  Empresas:['Id','Title','Razao','CNPJ','Regime','Plano','DataEntrada','Nova','Obs'],
+  PlanoContas:['Id','Title','Descricao','ContasJSON'],
+  Bancos:['Id','Title','Empresa','Banco','Agencia','Conta','Tipo','ContaContabil','Saldo','DataSaldo'],
+  Lancamentos:['Id','Empresa','Banco','Data','ContaD','ContaC','Valor','Historico','CodHistorico','Documento','Origem','Conciliado'],
+  Regras:['Id','Empresa','Pattern','ContaD','ContaC','Historico','CodHistorico']
+};
+
+async function xlGetRows(table){
+  await resolveWorkbook();
+  const headers = TABLE_HEADERS[table];
+  let rows=[], url=`/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows?$top=200`;
+  let guard=0;
+  while(url && guard<500){
+    guard++;
+    const resp = await graph('GET', url);
+    rows = rows.concat(resp.value||[]);
+    url = resp['@odata.nextLink'] ? resp['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0','') : null;
+  }
+  return rows.map((r,i)=>{
+    const vals=r.values[0];
+    const obj={_rowIndex:i};
+    headers.forEach((h,ci)=>obj[h]=vals[ci]);
+    return obj;
+  });
+}
+
+async function xlAddRow(table, obj){
+  await resolveWorkbook();
+  const headers = TABLE_HEADERS[table];
+  const values = headers.map(h=> obj[h]===undefined||obj[h]===null ? '' : obj[h] );
+  await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows/add`, {values:[values]});
+}
+
+async function xlUpdateRowById(table, id, obj){
+  const rows = await xlGetRows(table);
+  const row = rows.find(r=>String(r.Id)===String(id));
+  if(!row) throw new Error(`Linha Id=${id} não encontrada em ${table}`);
+  const headers = TABLE_HEADERS[table];
+  const values = headers.map(h=> obj[h]===undefined||obj[h]===null ? '' : obj[h] );
+  await graph('PATCH', `/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows/itemAt(index=${row._rowIndex})`, {values:[values]});
+}
+
+async function xlDeleteRowById(table, id){
+  const rows = await xlGetRows(table);
+  const row = rows.find(r=>String(r.Id)===String(id));
+  if(!row) return;
+  await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows/itemAt(index=${row._rowIndex})/delete`, {});
+}
+
+async function xlUploadFile(filename, arrayBuffer, contentType){
+  await resolveWorkbook();
+  const path = `${SP_CONFIG.extratosFolder}/${filename}`;
+  return graphRaw('PUT', `/drives/${_driveId}/root:/${encPath(path)}:/content`, arrayBuffer, contentType);
+}
+
+// -------------------- mapeamento DB <-> linha da tabela --------------------
+function empToRow(e){
+  const tpl=getTpl(e.planoId);
+  return {Id:e.id, Title:e.nome, Razao:e.razao||'', CNPJ:e.cnpj||'', Regime:e.regime||'',
+    Plano:tpl?tpl.nome:'', DataEntrada:e.dataEntrada||'', Nova:e.isNova?'Sim':'Não', Obs:e.obs||''};
+}
+function rowToEmp(r){
+  const tpl=DB.templates.find(t=>t.nome===r.Plano);
+  return {id:String(r.Id), nome:r.Title||'', razao:r.Razao||'', cnpj:r.CNPJ||'', regime:r.Regime||'',
+    planoId:tpl?tpl.id:null, dataEntrada:r.DataEntrada?String(r.DataEntrada).slice(0,10):'',
+    isNova:r.Nova==='Sim', obs:r.Obs||'', razaoImportada:false};
+}
+function tplToRow(t){ return {Id:t.id, Title:t.nome, Descricao:t.descricao||'', ContasJSON:JSON.stringify(t.contas||[])}; }
+function rowToTpl(r){
+  let contas=[]; try{ contas=JSON.parse(r.ContasJSON||'[]'); }catch(e){ contas=[]; }
+  return {id:String(r.Id), nome:r.Title||'', descricao:r.Descricao||'', contas};
+}
+function bancoToRow(b){
+  const e=getEmp(b.empId);
+  return {Id:b.id, Title:b.apelido||'', Empresa:e?e.cnpj:'', Banco:b.banco||'', Agencia:b.agencia||'',
+    Conta:b.conta||'', Tipo:b.tipo||'', ContaContabil:b.contabil||'', Saldo:b.saldo||0, DataSaldo:b.dataSaldo||''};
+}
+function rowToBanco(r){
+  const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
+  return {id:String(r.Id), empId:e?e.id:null, apelido:r.Title||'', banco:r.Banco||'', agencia:r.Agencia||'',
+    conta:r.Conta||'', tipo:r.Tipo||'', contabil:r.ContaContabil||'', saldo:parseFloat(r.Saldo)||0,
+    dataSaldo:r.DataSaldo?String(r.DataSaldo).slice(0,10):''};
+}
+function lancToRow(l){
+  const e=getEmp(l.empId); const b=l.bancoId?DB.bancos.find(x=>x.id===l.bancoId):null;
+  return {Id:l.id, Empresa:e?e.cnpj:'', Banco:b?b.apelido:'', Data:l.data, ContaD:l.contaD, ContaC:l.contaC,
+    Valor:l.valor||0, Historico:l.hist||'', CodHistorico:l.codHist||'', Documento:l.doc||'', Origem:l.origem||'',
+    Conciliado:l.conciliado?'Sim':'Não'};
+}
+function rowToLanc(r){
+  const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
+  const b=r.Banco?DB.bancos.find(x=>x.apelido===r.Banco && (!e||x.empId===e.id)):null;
+  return {id:String(r.Id), empId:e?e.id:null, bancoId:b?b.id:null, data:r.Data?String(r.Data).slice(0,10):'',
+    contaD:r.ContaD||'', contaC:r.ContaC||'', valor:parseFloat(r.Valor)||0, hist:r.Historico||'',
+    codHist:r.CodHistorico||'', doc:r.Documento||'', origem:r.Origem||'', conciliado:r.Conciliado==='Sim'};
+}
+function regraToRow(reg){
+  const e=getEmp(reg.empId);
+  return {Id:reg.id, Empresa:e?e.cnpj:'', Pattern:reg.pattern||'', ContaD:reg.contaD||'', ContaC:reg.contaC||'',
+    Historico:reg.hist||'', CodHistorico:reg.codHist||''};
+}
+function rowToRegra(r){
+  const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
+  return {id:String(r.Id), empId:e?e.id:null, pattern:r.Pattern||'', contaD:r.ContaD||'', contaC:r.ContaC||'',
+    hist:r.Historico||'', codHist:r.CodHistorico||''};
+}
+
+// -------------------- carga inicial --------------------
+async function loadAllData(){
+  const [plRows] = await Promise.all([xlGetRows('PlanoContas')]);
+  if(plRows.length===0){
+    // Planilha vazia: semeia os 3 templates padrão
+    const defaults=[
+      {id:uid(),nome:'Simples Nacional - Padrão',descricao:'Plano padrão para empresas no Simples Nacional',contas:getContasPadrao()},
+      {id:uid(),nome:'Lucro Presumido - Padrão',descricao:'Plano padrão para empresas no Lucro Presumido',contas:getContasPadrao()},
+      {id:uid(),nome:'Lucro Real - Padrão',descricao:'Plano padrão para empresas no Lucro Real',contas:getContasPadrao()}
+    ];
+    for(const t of defaults){ await xlAddRow('PlanoContas', tplToRow(t)); }
+    DB.templates = defaults;
+  } else {
+    DB.templates = plRows.filter(r=>r.Id).map(rowToTpl);
+  }
+  const [empRows, bancoRows, lancRows, regraRows] = await Promise.all([
+    xlGetRows('Empresas'), xlGetRows('Bancos'), xlGetRows('Lancamentos'), xlGetRows('Regras')
+  ]);
+  DB.empresas = empRows.filter(r=>r.Id).map(rowToEmp);
+  DB.bancos = bancoRows.filter(r=>r.Id).map(rowToBanco);
+  DB.lancamentos = lancRows.filter(r=>r.Id).map(rowToLanc);
+  DB.regras = regraRows.filter(r=>r.Id).map(rowToRegra);
+  DB.movimentos = [];
+}
+
+// -------------------- login gate --------------------
+async function gateLogin(){
+  const btn=document.getElementById('login-gate-btn'), status=document.getElementById('login-gate-status');
+  btn.disabled=true; status.textContent='Entrando...';
+  try{
+    await graphLoginInteractive();
+    status.textContent='Carregando dados...';
+    await loadAllData();
+    document.getElementById('login-gate').style.display='none';
+    go('dash');
+  }catch(e){
+    status.textContent='Erro no login: '+e.message;
+    btn.disabled=false;
+  }
+}
+async function trySilentLogin(){
+  try{
+    await graphLoginSilent();
+    document.getElementById('login-gate-status').textContent='Carregando dados...';
+    await loadAllData();
+    document.getElementById('login-gate').style.display='none';
+    go('dash');
+  }catch(e){ /* mantém tela de login visível */ }
+}
+</script>
+<script>
+// ============================================================
+// DATA STORE
+// ============================================================
+const DB = {
+  templates: [],      // Plano de Contas templates
+  empresas: [],       // Companies
+  bancos: [],         // Bank accounts
+  lancamentos: [],    // Accounting entries
+  movimentos: [],     // Bank transactions (imported)
+  regras: [],         // Auto-classification rules (learned)
+};
+
+// Temp state
+let _tplEdit = null;        // template being edited
+let _empEdit = null;        // empresa being edited id
+let _classQueue = [];       // unclassified transactions queue
+let _classIdx = 0;          // current index in queue
+let _classEmpId = null;     // empresa context for classification
+let _importPreview = [];    // parsed transactions for preview
+let _importEmpId = null;
+let _importBancoId = null;
+
+// ============================================================
+// UTILITIES
+// ============================================================
+const uid = () => Math.random().toString(36).slice(2,9)+Date.now().toString(36);
+
+const R$ = v => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0);
+
+function fmtDate(s){
+  if(!s)return'-';
+  const d=new Date(s+'T00:00:00');
+  return d.toLocaleDateString('pt-BR');
+}
+
+function parseDate(s){
+  if(!s)return null;
+  s=s.trim();
+  if(/^\d{8}$/.test(s)) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){const[d,m,y]=s.split('/');return`${y}-${m}-${d}`;}
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return null;
+}
+
+function fmtDateExport(s){
+  if(!s)return'';
+  const d=new Date(s+'T00:00:00');
+  return`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+}
+
+function fmtBR(v){return(+v||0).toFixed(2).replace('.',',');}
+
+function toast(msg,type='success'){
+  const el=document.getElementById('tst');
+  const m=document.getElementById('tstMsg');
+  el.className=`toast align-items-center border-0 text-bg-${type}`;
+  m.textContent=msg;
+  new bootstrap.Toast(el,{delay:3200}).show();
+}
+
+const getEmp = id => DB.empresas.find(e=>e.id===id);
+const getTpl = id => DB.templates.find(t=>t.id===id);
+const getBancos = empId => DB.bancos.filter(b=>b.empId===empId);
+
+function getContasAnaliticas(empId){
+  const emp=getEmp(empId); if(!emp)return[];
+  const tpl=getTpl(emp.planoId); if(!tpl)return[];
+  return tpl.contas.filter(c=>c.nivel==4&&c.aceita);
+}
+
+function autoClassify(txn, empId){
+  const desc=(txn.descricao||'').toLowerCase();
+  const r=DB.regras.find(r=>r.empId===empId && desc.includes(r.pattern.toLowerCase()));
+  if(!r)return false;
+  txn.contaD=r.contaD; txn.contaC=r.contaC;
+  txn.codHist=r.codHist; txn.hist=r.hist;
+  return true;
+}
+
+// ============================================================
+// DADOS PADRÃO - Plano de Contas
+// ============================================================
+function getContasPadrao(){
+  return[
+    {codigo:'1',nome:'ATIVO',tipo:'Ativo',natureza:'D',nivel:1,aceita:false,hp:'',ch:0},
+    {codigo:'1.1',nome:'ATIVO CIRCULANTE',tipo:'Ativo',natureza:'D',nivel:2,aceita:false,hp:'',ch:0},
+    {codigo:'1.1.1',nome:'DISPONIBILIDADES',tipo:'Ativo',natureza:'D',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'1.1.1.001',nome:'Caixa Geral',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Movimentação de caixa',ch:1},
+    {codigo:'1.1.1.002',nome:'Bancos - Conta Corrente',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Movimentação bancária',ch:2},
+    {codigo:'1.1.1.003',nome:'Bancos - Aplicações Financeiras',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Aplicação financeira',ch:3},
+    {codigo:'1.1.2',nome:'CRÉDITOS A RECEBER',tipo:'Ativo',natureza:'D',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'1.1.2.001',nome:'Clientes',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Recebimento de clientes',ch:10},
+    {codigo:'1.1.2.002',nome:'Adiantamentos a Clientes',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Adiantamento recebido',ch:11},
+    {codigo:'1.1.2.003',nome:'Impostos a Recuperar',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Recuperação de impostos',ch:12},
+    {codigo:'1.1.3',nome:'ESTOQUES',tipo:'Ativo',natureza:'D',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'1.1.3.001',nome:'Mercadorias',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Movimentação de estoque',ch:20},
+    {codigo:'1.2',nome:'ATIVO NÃO CIRCULANTE',tipo:'Ativo',natureza:'D',nivel:2,aceita:false,hp:'',ch:0},
+    {codigo:'1.2.1',nome:'IMOBILIZADO',tipo:'Ativo',natureza:'D',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'1.2.1.001',nome:'Equipamentos e Máquinas',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Aquisição de imobilizado',ch:30},
+    {codigo:'1.2.1.002',nome:'Móveis e Utensílios',tipo:'Ativo',natureza:'D',nivel:4,aceita:true,hp:'Aquisição de móveis',ch:31},
+    {codigo:'1.2.1.003',nome:'(-) Depreciação Acumulada',tipo:'Ativo',natureza:'C',nivel:4,aceita:true,hp:'Depreciação do período',ch:32},
+    {codigo:'2',nome:'PASSIVO',tipo:'Passivo',natureza:'C',nivel:1,aceita:false,hp:'',ch:0},
+    {codigo:'2.1',nome:'PASSIVO CIRCULANTE',tipo:'Passivo',natureza:'C',nivel:2,aceita:false,hp:'',ch:0},
+    {codigo:'2.1.1',nome:'FORNECEDORES',tipo:'Passivo',natureza:'C',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'2.1.1.001',nome:'Fornecedores Nacionais',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Pagamento a fornecedores',ch:40},
+    {codigo:'2.1.2',nome:'OBRIGAÇÕES FISCAIS',tipo:'Passivo',natureza:'C',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'2.1.2.001',nome:'Simples Nacional a Pagar',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Pagamento Simples Nacional',ch:50},
+    {codigo:'2.1.2.002',nome:'FGTS a Recolher',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Recolhimento FGTS',ch:51},
+    {codigo:'2.1.2.003',nome:'INSS a Recolher',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Recolhimento INSS',ch:52},
+    {codigo:'2.1.2.004',nome:'ISS a Recolher',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Pagamento ISS',ch:53},
+    {codigo:'2.1.3',nome:'OBRIGAÇÕES TRABALHISTAS',tipo:'Passivo',natureza:'C',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'2.1.3.001',nome:'Salários a Pagar',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Pagamento de salários',ch:60},
+    {codigo:'2.1.3.002',nome:'Pró-Labore a Pagar',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Pagamento pró-labore',ch:61},
+    {codigo:'2.1.4',nome:'EMPRÉSTIMOS',tipo:'Passivo',natureza:'C',nivel:3,aceita:false,hp:'',ch:0},
+    {codigo:'2.1.4.001',nome:'Empréstimos Bancários',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Empréstimo bancário',ch:70},
+    {codigo:'2.2',nome:'PASSIVO NÃO CIRCULANTE',tipo:'Passivo',natureza:'C',nivel:2,aceita:false,hp:'',ch:0},
+    {codigo:'2.2.1.001',nome:'Financiamentos a Longo Prazo',tipo:'Passivo',natureza:'C',nivel:4,aceita:true,hp:'Financiamento LP',ch:71},
+    {codigo:'3',nome:'PATRIMÔNIO LÍQUIDO',tipo:'PL',natureza:'C',nivel:1,aceita:false,hp:'',ch:0},
+    {codigo:'3.1.1.001',nome:'Capital Social',tipo:'PL',natureza:'C',nivel:4,aceita:true,hp:'Integralização de capital',ch:80},
+    {codigo:'3.1.2.001',nome:'Lucros/Prejuízos Acumulados',tipo:'PL',natureza:'C',nivel:4,aceita:true,hp:'Resultado do exercício',ch:81},
+    {codigo:'3.1.3.001',nome:'Reservas de Lucro',tipo:'PL',natureza:'C',nivel:4,aceita:true,hp:'Reserva de lucros',ch:82},
+    {codigo:'4',nome:'RECEITAS',tipo:'Receita',natureza:'C',nivel:1,aceita:false,hp:'',ch:0},
+    {codigo:'4.1',nome:'RECEITAS OPERACIONAIS',tipo:'Receita',natureza:'C',nivel:2,aceita:false,hp:'',ch:0},
+    {codigo:'4.1.1.001',nome:'Receita de Serviços',tipo:'Receita',natureza:'C',nivel:4,aceita:true,hp:'Prestação de serviços',ch:90},
+    {codigo:'4.1.1.002',nome:'Receita de Vendas de Mercadorias',tipo:'Receita',natureza:'C',nivel:4,aceita:true,hp:'Venda de mercadorias',ch:91},
+    {codigo:'4.2.1.001',nome:'Receitas Financeiras',tipo:'Receita',natureza:'C',nivel:4,aceita:true,hp:'Rendimento financeiro',ch:92},
+    {codigo:'5',nome:'CUSTOS',tipo:'Custos',natureza:'D',nivel:1,aceita:false,hp:'',ch:0},
+    {codigo:'5.1.1.001',nome:'Custo dos Serviços Prestados',tipo:'Custos',natureza:'D',nivel:4,aceita:true,hp:'Custo de serviços',ch:100},
+    {codigo:'5.1.1.002',nome:'Custo das Mercadorias Vendidas',tipo:'Custos',natureza:'D',nivel:4,aceita:true,hp:'Custo de mercadorias',ch:101},
+    {codigo:'6',nome:'DESPESAS',tipo:'Despesa',natureza:'D',nivel:1,aceita:false,hp:'',ch:0},
+    {codigo:'6.1',nome:'DESPESAS OPERACIONAIS',tipo:'Despesa',natureza:'D',nivel:2,aceita:false,hp:'',ch:0},
+    {codigo:'6.1.1.001',nome:'Despesas com Pessoal',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Despesas com pessoal',ch:110},
+    {codigo:'6.1.1.002',nome:'Despesas Administrativas',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Despesas administrativas',ch:111},
+    {codigo:'6.1.1.003',nome:'Despesas com Energia Elétrica',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Pagamento energia elétrica',ch:112},
+    {codigo:'6.1.1.004',nome:'Despesas com Aluguel',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Pagamento de aluguel',ch:113},
+    {codigo:'6.1.1.005',nome:'Despesas Bancárias',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Tarifas e despesas bancárias',ch:114},
+    {codigo:'6.1.1.006',nome:'Despesas com Marketing',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Despesas de marketing',ch:115},
+    {codigo:'6.1.1.007',nome:'Pró-Labore',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Pagamento pró-labore',ch:116},
+    {codigo:'6.1.1.008',nome:'Despesas com Telefone/Internet',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Serviços de telecomunicações',ch:117},
+    {codigo:'6.1.1.009',nome:'Despesas com Contabilidade',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Honorários contábeis',ch:118},
+    {codigo:'6.1.1.010',nome:'Despesas com Depreciação',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Depreciação do período',ch:119},
+    {codigo:'6.2.1.001',nome:'Despesas Financeiras',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Juros e encargos financeiros',ch:120},
+    {codigo:'6.2.1.002',nome:'Despesas com IOF',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'IOF sobre operações financeiras',ch:121},
+  ];
+}
+
+// initData() foi substituída por loadAllData() (ver módulo Graph/Excel acima),
+// chamada após o login bem-sucedido.
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+let _view='dash';
+let _vstate={};
+
+function go(view,state={}){
+  _view=view; _vstate=state;
+  document.querySelectorAll('.ni').forEach(e=>e.classList.remove('active'));
+  const navMap={dash:'dash',plano:'plano',empresas:'empresas',import:'import',
+    lanc:'lanc',concil:'concil',razao:'razao',export:'export',
+    'plano-edit':'plano','emp-form':'empresas','emp-det':'empresas'};
+  const target=navMap[view]||view;
+  document.querySelectorAll('.ni').forEach(e=>{
+    if(e.getAttribute('onclick')===`go('${target}')`) e.classList.add('active');
+  });
+  const renders={dash:renderDash,plano:renderPlano,'plano-edit':renderPlanoEdit,
+    empresas:renderEmpresas,'emp-form':renderEmpForm,'emp-det':renderEmpDet,
+    import:renderImport,lanc:renderLanc,concil:renderConcil,razao:renderRazao,export:renderExport};
+  const fn=renders[view];
+  document.getElementById('pg').innerHTML=fn?fn(state):'<p>404</p>';
+  window.scrollTo(0,0);
+  if(view==='lanc') initLancModal();
+}
+</script>
+<script>
+// ============================================================
+// PARSERS
+// ============================================================
+
+// --- OFX Parser ---
+function parseOFX(content){
+  const getTag=(s,tag)=>{const r=new RegExp(`<${tag}>([^<\r\n]+)`,'i');const m=s.match(r);return m?m[1].trim():null;};
+  const txns=[];
+  const blocks=[...content.matchAll(/<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi)];
+  for(const b of blocks){
+    const raw=b[1];
+    const trntype=getTag(raw,'TRNTYPE')||'';
+    const dtposted=getTag(raw,'DTPOSTED')||'';
+    const amt=getTag(raw,'TRNAMT')||'0';
+    const fitid=getTag(raw,'FITID')||uid();
+    const memo=getTag(raw,'MEMO')||getTag(raw,'NAME')||'';
+    const valor=parseFloat(amt.replace(',','.'));
+    txns.push({
+      id:fitid, data:parseDate(dtposted.slice(0,8)),
+      valor:Math.abs(valor), tipo:valor>=0?'C':'D',
+      descricao:memo, origem:'OFX', conciliado:false
+    });
+  }
+  const bankId=getTag(content,'BANKID');
+  const acctId=getTag(content,'ACCTID');
+  const saldo=getTag(content,'BALAMT');
+  return{transactions:txns, bankId, acctId, saldo:saldo?parseFloat(saldo.replace(',','.')):null};
+}
+
+// --- Excel Parser ---
+function parseExcel(buffer){
+  const wb=XLSX.read(buffer,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  const txns=[];
+  let hdr=-1,dc=-1,desc=-1,val=-1,tipo=-1,cred=-1,deb=-1;
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const r=rows[i].map(c=>String(c).toLowerCase().trim());
+    const hasD=r.some(c=>c.includes('data'));
+    const hasV=r.some(c=>c.includes('valor')||c.includes('amount'));
+    if(hasD&&hasV){
+      hdr=i;
+      dc=r.findIndex(c=>c.includes('data'));
+      desc=r.findIndex(c=>c.includes('hist')||c.includes('descr')||c.includes('memo')||c.includes('lancamento'));
+      val=r.findIndex(c=>c.includes('valor')||c.includes('amount'));
+      tipo=r.findIndex(c=>c==='d/c'||c==='tipo'||c==='nat');
+      cred=r.findIndex(c=>c.includes('credit')||c==='entrad'||c==='entrada');
+      deb=r.findIndex(c=>c.includes('debit')||c==='saida'||c==='saída');
+      break;
+    }
+  }
+  if(hdr<0){hdr=0;dc=0;desc=1;val=2;}
+  for(let i=hdr+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r||r.every(c=>!c))continue;
+    const dv=r[dc];
+    let dataStr;
+    if(typeof dv==='number'){
+      const d=XLSX.SSF.parse_date_code(dv);
+      if(d) dataStr=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+      else continue;
+    } else { dataStr=parseDate(String(dv)); }
+    if(!dataStr)continue;
+    let valor;
+    // Try separate debit/credit columns first
+    if(deb>=0||cred>=0){
+      const d2=parseFloat(String(r[deb]||'0').replace(/[^\d,.]/g,'').replace(',','.'));
+      const c2=parseFloat(String(r[cred]||'0').replace(/[^\d,.]/g,'').replace(',','.'));
+      if(c2>0){valor=c2;txns.push({id:uid(),data:dataStr,valor:c2,tipo:'C',descricao:String(r[desc]||''),origem:'Excel',conciliado:false});}
+      if(d2>0){txns.push({id:uid(),data:dataStr,valor:d2,tipo:'D',descricao:String(r[desc]||''),origem:'Excel',conciliado:false});}
+      continue;
+    }
+    valor=parseFloat(String(r[val]||'0').replace(/[^\d,.-]/g,'').replace(',','.'));
+    if(isNaN(valor)||valor===0)continue;
+    let t='C';
+    if(tipo>=0) t=String(r[tipo]).toUpperCase()==='D'?'D':'C';
+    else t=valor>=0?'C':'D';
+    txns.push({id:uid(),data:dataStr,valor:Math.abs(valor),tipo:t,descricao:String(r[desc]||''),origem:'Excel',conciliado:false});
+  }
+  return{transactions:txns};
+}
+
+// --- PDF Parser (text heuristic) ---
+async function parsePDF(buffer){
+  if(typeof pdfjsLib==='undefined')return{transactions:[],rawText:'PDF.js não carregado'};
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+  let txt='';
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const tc=await page.getTextContent();
+    txt+=tc.items.map(i=>i.str).join(' ')+'\n';
+  }
+  const txns=[];
+  // Pattern: DD/MM/YYYY ... value (with optional D/C)
+  const pat=/(\d{2}\/\d{2}\/\d{4})\s+(.{3,60?}?)\s+([\d.,]{3,})\s*([DC])?/g;
+  let m;
+  while((m=pat.exec(txt))!==null){
+    const v=parseFloat(m[3].replace(/\./g,'').replace(',','.'));
+    if(isNaN(v)||v===0)continue;
+    const t=m[4]?m[4]:(v>=0?'C':'D');
+    txns.push({id:uid(),data:parseDate(m[1]),valor:Math.abs(v),tipo:t,descricao:m[2].trim(),origem:'PDF',conciliado:false});
+  }
+  return{transactions:txns,rawText:txt};
+}
+
+// ============================================================
+// VIEW: DASHBOARD
+// ============================================================
+function renderDash(){
+  const tl=DB.lancamentos.length;
+  const tc=DB.lancamentos.filter(l=>l.conciliado).length;
+  const tp=tl-tc;
+  const tv=DB.lancamentos.reduce((s,l)=>s+l.valor,0);
+  return`
+  <div class="ph"><div><h2>📊 Dashboard</h2><p>Visão geral do sistema</p></div>
+    <small class="text-muted">${new Date().toLocaleDateString('pt-BR',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</small>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff">🏢</div>
+      <h3>${DB.empresas.length}</h3><p>Empresas</p>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#f0fdf4">📄</div>
+      <h3>${tl}</h3><p>Lançamentos</p>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#fefce8">✅</div>
+      <h3>${tc}</h3><p>Conciliados</p>
+    </div></div>
+    <div class="col-6 col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#fff7ed">⚠️</div>
+      <h3 class="${tp>0?'text-warning':''}">${tp}</h3><p>Pendentes</p>
+    </div></div>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-8">
+      <div class="dt">
+        <div class="dth"><h5>📋 Últimos Lançamentos</h5>
+          <button class="btn btn-sm btn-outline-primary" onclick="go('lanc')">Ver todos</button>
+        </div>
+        ${tl===0?`<div class="empty-state"><div class="icon">📭</div><p>Nenhum lançamento ainda</p>
+          <button class="btn btn-sm btn-primary mt-1" onclick="go('import')">Importar extratos</button></div>`:`
+        <table class="table table-hover mb-0">
+          <thead><tr><th>Data</th><th>Empresa</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Status</th></tr></thead>
+          <tbody>${DB.lancamentos.slice(-8).reverse().map(l=>{
+            const e=getEmp(l.empId);
+            return`<tr>
+              <td>${fmtDate(l.data)}</td>
+              <td><small>${e?e.nome:'-'}</small></td>
+              <td><small class="vd">${l.contaD}</small></td>
+              <td><small class="vc">${l.contaC}</small></td>
+              <td>${R$(l.valor)}</td>
+              <td><span class="badge ${l.conciliado?'bg-success':'bg-warning text-dark'}">${l.conciliado?'Conciliado':'Pendente'}</span></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`}
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="dt mb-3">
+        <div class="dth"><h5>🏢 Empresas</h5>
+          <button class="btn btn-sm btn-outline-secondary" onclick="go('empresas')">Gerenciar</button>
+        </div>
+        ${DB.empresas.length===0?`<div class="empty-state py-3"><p>Nenhuma empresa</p>
+          <button class="btn btn-sm btn-primary" onclick="go('emp-form')">+ Adicionar</button></div>`:`
+        <div class="list-group list-group-flush">
+          ${DB.empresas.slice(0,5).map(e=>`
+            <div class="list-group-item d-flex align-items-center gap-2 py-2 px-3" style="cursor:pointer" onclick="go('emp-det',{id:'${e.id}'})">
+              <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0" style="width:32px;height:32px;font-size:.8rem">${e.nome.charAt(0).toUpperCase()}</div>
+              <div class="flex-grow-1 overflow-hidden">
+                <div class="fw-semibold small text-truncate">${e.nome}</div>
+                <div style="font-size:.7rem;color:#94a3b8">${e.cnpj||'CNPJ não informado'}</div>
+              </div>
+              <span class="${e.isNova?'tag-novo':'tag-exist'}">${e.isNova?'Novo':'Existente'}</span>
+            </div>
+          `).join('')}
+        </div>`}
+      </div>
+      <div class="sc">
+        <h6>⚡ Ações Rápidas</h6>
+        <div class="d-grid gap-2">
+          <button class="btn btn-outline-primary btn-sm" onclick="go('import')"><i class="bi bi-cloud-upload me-1"></i>Importar OFX / Excel / PDF</button>
+          <button class="btn btn-outline-success btn-sm" onclick="go('concil')"><i class="bi bi-check2-square me-1"></i>Conciliar Extratos</button>
+          <button class="btn btn-outline-secondary btn-sm" onclick="go('export')"><i class="bi bi-file-earmark-arrow-down me-1"></i>Exportar Domínio</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ============================================================
+// VIEW: PLANO DE CONTAS (lista de templates)
+// ============================================================
+function renderPlano(){
+  return`
+  <div class="ph"><div><h2>📋 Plano de Contas</h2><p>Templates de plano de contas</p></div>
+    <button class="btn btn-primary btn-sm" onclick="go('plano-edit',{id:null})"><i class="bi bi-plus-lg me-1"></i>Novo Template</button>
+  </div>
+  <div class="row g-3">
+    ${DB.templates.length===0?`<div class="col-12"><div class="dt"><div class="empty-state"><div class="icon">📊</div>
+      <p>Nenhum template cadastrado</p><button class="btn btn-primary btn-sm" onclick="go('plano-edit',{id:null})">Criar Template</button>
+    </div></div></div>`:
+    DB.templates.map(t=>`
+      <div class="col-md-6">
+        <div class="dt h-100">
+          <div class="dth">
+            <div><h5 class="mb-0">${t.nome}</h5><small class="text-muted">${t.descricao}</small></div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-primary" onclick="go('plano-edit',{id:'${t.id}'})"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-danger" onclick="delTpl('${t.id}')"><i class="bi bi-trash"></i></button>
+            </div>
+          </div>
+          <div class="p-3">
+            <div class="d-flex gap-2 mb-3 flex-wrap">
+              <span class="badge bg-primary">${t.contas.length} contas</span>
+              <span class="badge bg-success">${t.contas.filter(c=>c.aceita).length} analíticas</span>
+              <span class="badge bg-secondary">${DB.empresas.filter(e=>e.planoId===t.id).length} empresas</span>
+            </div>
+            <div style="max-height:180px;overflow-y:auto">
+              ${t.contas.slice(0,12).map(c=>`
+                <div class="tree-row ${c.nivel==4?'l4':''}" style="padding-left:${(c.nivel-1)*14}px">
+                  <span class="badge-${c.natureza} me-1">${c.natureza}</span>
+                  <span class="text-muted me-1" style="font-size:.72rem">${c.codigo}</span>
+                  <span style="font-size:.8rem">${c.nome}</span>
+                </div>
+              `).join('')}
+              ${t.contas.length>12?`<div class="text-muted ps-3 mt-1" style="font-size:.72rem">... e mais ${t.contas.length-12} contas</div>`:''}
+            </div>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+// VIEW: EDITAR PLANO
+function renderPlanoEdit(state){
+  const id=state&&state.id;
+  if(id){
+    _tplEdit=JSON.parse(JSON.stringify(getTpl(id)));
+  } else {
+    _tplEdit={id:uid(),nome:'',descricao:'',contas:[]};
+  }
+  const t=_tplEdit;
+  return`
+  <div class="ph"><div><h2>${id?'✏️ Editar':'➕ Novo'} Template</h2><p>Plano de contas</p></div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="go('plano')">← Voltar</button>
+      <button class="btn btn-success btn-sm" onclick="saveTpl()"><i class="bi bi-check-lg me-1"></i>Salvar Template</button>
+    </div>
+  </div>
+  <div class="sc mb-3">
+    <h6>Informações do Template</h6>
+    <div class="row g-3">
+      <div class="col-md-5"><label class="form-label">Nome do Template *</label>
+        <input type="text" id="tplNome" class="form-control" value="${t.nome}" placeholder="Ex: Simples Nacional - Padrão"></div>
+      <div class="col-md-7"><label class="form-label">Descrição</label>
+        <input type="text" id="tplDesc" class="form-control" value="${t.descricao}" placeholder="Descrição do plano"></div>
+      <div class="col-12">
+        <button class="btn btn-outline-secondary btn-sm me-2" onclick="importContasPadrao()">
+          <i class="bi bi-download me-1"></i>Importar Contas Padrão
+        </button>
+        <small class="text-muted">Importa o plano de contas padrão Lucralize</small>
+      </div>
+    </div>
+  </div>
+  <div class="dt">
+    <div class="dth">
+      <h5>📊 Contas (${t.contas.length})</h5>
+      <button class="btn btn-primary btn-sm" onclick="openContaModal(-1)"><i class="bi bi-plus-lg me-1"></i>Adicionar Conta</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Código</th><th>Nome</th><th>Tipo</th><th>Nat.</th><th>Nível</th><th>Analítica</th><th>Ações</th></tr></thead>
+        <tbody id="contasBody">
+          ${renderContasRows()}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderContasRows(){
+  if(!_tplEdit)return'';
+  return _tplEdit.contas.map((c,i)=>`
+    <tr style="padding-left:${(c.nivel-1)*12}px">
+      <td><small>${c.codigo}</small></td>
+      <td style="padding-left:${(c.nivel-1)*12}px"><small ${c.nivel==4?'class="fw-semibold"':'class="text-muted"'}>${c.nome}</small></td>
+      <td><small>${c.tipo}</small></td>
+      <td><span class="badge-${c.natureza}">${c.natureza}</span></td>
+      <td><small>${c.nivel}</small></td>
+      <td>${c.aceita?'<span class="badge bg-success">Sim</span>':'<span class="badge bg-light text-muted">Não</span>'}</td>
+      <td>
+        <button class="btn btn-xs btn-outline-primary me-1" style="padding:1px 6px;font-size:.7rem" onclick="openContaModal(${i})"><i class="bi bi-pencil"></i></button>
+        <button class="btn btn-xs btn-outline-danger" style="padding:1px 6px;font-size:.7rem" onclick="delConta(${i})"><i class="bi bi-trash"></i></button>
+      </td>
+    </tr>
+  `).join('')||'<tr><td colspan="7" class="text-center text-muted py-3">Nenhuma conta cadastrada</td></tr>';
+}
+
+// ============================================================
+// VIEW: EMPRESAS
+// ============================================================
+function renderEmpresas(){
+  return`
+  <div class="ph"><div><h2>🏢 Empresas</h2><p>Cadastro de empresas</p></div>
+    <button class="btn btn-primary btn-sm" onclick="go('emp-form',{id:null})"><i class="bi bi-plus-lg me-1"></i>Nova Empresa</button>
+  </div>
+  <div class="dt">
+    <div class="dth"><h5>Lista de Empresas</h5><span class="badge bg-secondary">${DB.empresas.length}</span></div>
+    ${DB.empresas.length===0?`<div class="empty-state"><div class="icon">🏢</div>
+      <p>Nenhuma empresa cadastrada</p>
+      <button class="btn btn-primary btn-sm" onclick="go('emp-form',{id:null})">Cadastrar Empresa</button>
+    </div>`:`
+    <table class="table table-hover mb-0">
+      <thead><tr><th>Empresa</th><th>CNPJ</th><th>Plano de Contas</th><th>Entrada Lucralize</th><th>Tipo</th><th>Bancos</th><th>Ações</th></tr></thead>
+      <tbody>${DB.empresas.map(e=>{
+        const tpl=getTpl(e.planoId);
+        const bcs=getBancos(e.id);
+        return`<tr>
+          <td><strong>${e.nome}</strong><br><small class="text-muted">${e.razao||''}</small></td>
+          <td><small>${e.cnpj||'-'}</small></td>
+          <td><small>${tpl?tpl.nome:'<span class="text-danger">Não vinculado</span>'}</small></td>
+          <td><small>${fmtDate(e.dataEntrada)}</small></td>
+          <td><span class="${e.isNova?'tag-novo':'tag-exist'}">${e.isNova?'Cliente Novo':'Cliente Existente'}</span></td>
+          <td><span class="badge bg-info text-dark">${bcs.length}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="go('emp-det',{id:'${e.id}'})"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="go('emp-form',{id:'${e.id}'})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="delEmp('${e.id}')"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`}
+  </div>`;
+}
+
+// VIEW: FORMULÁRIO EMPRESA
+function renderEmpForm(state){
+  const id=state&&state.id;
+  const e=id?getEmp(id):{id:uid(),nome:'',razao:'',cnpj:'',planoId:'',regime:'Simples Nacional',dataEntrada:'',isNova:true,razaoImportada:false,obs:''};
+  if(id) _empEdit=e; else { _empEdit=e; }
+  return`
+  <div class="ph"><div><h2>${id?'✏️ Editar':'➕ Nova'} Empresa</h2></div>
+    <button class="btn btn-outline-secondary btn-sm" onclick="go('empresas')">← Voltar</button>
+  </div>
+  <div class="sc mb-3">
+    <h6>Dados da Empresa</h6>
+    <div class="row g-3">
+      <div class="col-md-6"><label class="form-label">Nome Fantasia *</label>
+        <input type="text" id="eNome" class="form-control" value="${e.nome}" placeholder="Nome fantasia"></div>
+      <div class="col-md-6"><label class="form-label">Razão Social</label>
+        <input type="text" id="eRazao" class="form-control" value="${e.razao||''}" placeholder="Razão social"></div>
+      <div class="col-md-4"><label class="form-label">CNPJ</label>
+        <input type="text" id="eCNPJ" class="form-control" value="${e.cnpj||''}" placeholder="00.000.000/0001-00"></div>
+      <div class="col-md-4"><label class="form-label">Regime Tributário</label>
+        <select id="eRegime" class="form-select">
+          ${['Simples Nacional','Lucro Presumido','Lucro Real','MEI'].map(r=>`<option ${e.regime===r?'selected':''}>${r}</option>`).join('')}
+        </select>
+      </div>
+      <div class="col-md-4"><label class="form-label">Data de Entrada na Lucralize *</label>
+        <input type="date" id="eData" class="form-control" value="${e.dataEntrada||''}"></div>
+    </div>
+  </div>
+  <div class="sc mb-3">
+    <h6>Plano de Contas</h6>
+    <div class="row g-3">
+      <div class="col-md-8"><label class="form-label">Template de Plano de Contas *</label>
+        <select id="ePlano" class="form-select">
+          <option value="">Selecione um template...</option>
+          ${DB.templates.map(t=>`<option value="${t.id}" ${e.planoId===t.id?'selected':''}>${t.nome}</option>`).join('')}
+        </select>
+        <small class="text-muted">Gerencie templates em <a href="#" onclick="go('plano')">Plano de Contas</a></small>
+      </div>
+    </div>
+  </div>
+  <div class="sc mb-3">
+    <h6>Tipo de Cliente</h6>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="eNova" ${e.isNova?'checked':''} onchange="toggleNova()">
+          <label class="form-check-label fw-semibold" for="eNova">Cliente Novo na Lucralize</label>
+        </div>
+        <div id="novaInfo" class="${e.isNova?'':'d-none'} mt-2">
+          <div class="alert alert-success py-2 mb-0" style="font-size:.82rem">
+            <i class="bi bi-check-circle me-1"></i>
+            Cliente novo — <strong>não é necessário importar razão</strong>. Os lançamentos serão iniciados do zero.
+          </div>
+        </div>
+        <div id="existInfo" class="${e.isNova?'d-none':''} mt-2">
+          <div class="alert alert-info py-2 mb-0" style="font-size:.82rem">
+            <i class="bi bi-info-circle me-1"></i>
+            Cliente existente — importe o razão anterior em <strong>Razão / Aprendizado</strong> para que o sistema aprenda a classificação das contas.
+            ${e.razaoImportada?'<br><span class="badge bg-success mt-1">✓ Razão importado</span>':''}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6"><label class="form-label">Observações</label>
+        <textarea id="eObs" class="form-control" rows="3" placeholder="Informações adicionais">${e.obs||''}</textarea>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" onclick="saveEmp('${e.id}','${id?'edit':'new'}')">
+      <i class="bi bi-check-lg me-1"></i>Salvar Empresa
+    </button>
+    <button class="btn btn-outline-secondary" onclick="go('empresas')">Cancelar</button>
+  </div>`;
+}
+
+// VIEW: DETALHE EMPRESA
+function renderEmpDet(state){
+  const id=state&&state.id;
+  const e=getEmp(id);
+  if(!e)return`<p class="text-danger">Empresa não encontrada</p>`;
+  const tpl=getTpl(e.planoId);
+  const bcs=getBancos(e.id);
+  const lancs=DB.lancamentos.filter(l=>l.empId===id);
+  return`
+  <div class="ph"><div><h2>🏢 ${e.nome}</h2><p>${e.razao||''} ${e.cnpj?'· '+e.cnpj:''}</p></div>
+    <div class="d-flex gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="go('empresas')">← Voltar</button>
+      <button class="btn btn-outline-primary btn-sm" onclick="go('emp-form',{id:'${e.id}'})"><i class="bi bi-pencil me-1"></i>Editar</button>
+    </div>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="sc">
+      <h6>Informações</h6>
+      <table class="table table-sm mb-0">
+        <tr><td class="text-muted">Regime</td><td>${e.regime}</td></tr>
+        <tr><td class="text-muted">Entrada Lucralize</td><td>${fmtDate(e.dataEntrada)}</td></tr>
+        <tr><td class="text-muted">Tipo</td><td><span class="${e.isNova?'tag-novo':'tag-exist'}">${e.isNova?'Cliente Novo':'Existente'}</span></td></tr>
+        <tr><td class="text-muted">Razão Importado</td><td>${e.razaoImportada?'<span class="badge bg-success">Sim</span>':'<span class="badge bg-secondary">Não</span>'}</td></tr>
+        <tr><td class="text-muted">Plano de Contas</td><td><small>${tpl?tpl.nome:'Não vinculado'}</small></td></tr>
+        <tr><td class="text-muted">Lançamentos</td><td><strong>${lancs.length}</strong></td></tr>
+      </table>
+    </div></div>
+    <div class="col-md-8"><div class="dt">
+      <div class="dth"><h5>🏦 Contas Bancárias</h5>
+        <button class="btn btn-primary btn-sm" onclick="openBancoModal('${e.id}',null)"><i class="bi bi-plus-lg me-1"></i>Adicionar Banco</button>
+      </div>
+      ${bcs.length===0?`<div class="empty-state py-3"><p>Nenhum banco cadastrado</p></div>`:`
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Banco</th><th>Agência</th><th>Conta</th><th>Tipo</th><th>Conta Contábil</th><th>Saldo Inicial</th><th>Ações</th></tr></thead>
+        <tbody>${bcs.map(b=>`<tr>
+          <td><strong>${b.apelido}</strong><br><small class="text-muted">${b.banco}</small></td>
+          <td><small>${b.agencia||'-'}</small></td>
+          <td><small>${b.conta||'-'}</small></td>
+          <td><span class="badge bg-light text-dark">${b.tipo||'CC'}</span></td>
+          <td><small>${b.contabil||'-'}</small></td>
+          <td><small>${R$(b.saldo||0)}</small></td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="openBancoModal('${e.id}','${b.id}')"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="delBanco('${b.id}','${e.id}')"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table>`}
+    </div></div>
+  </div>
+  <div class="dt">
+    <div class="dth"><h5>📄 Lançamentos Recentes</h5>
+      <button class="btn btn-sm btn-outline-primary" onclick="go('import')">Importar extratos</button>
+    </div>
+    ${lancs.length===0?`<div class="empty-state py-3"><p>Nenhum lançamento</p></div>`:`
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Data</th><th>Banco</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Histórico</th><th>Conciliado</th></tr></thead>
+      <tbody>${lancs.slice(-10).reverse().map(l=>{
+        const b=getBancos(id).find(b=>b.id===l.bancoId);
+        return`<tr>
+          <td><small>${fmtDate(l.data)}</small></td>
+          <td><small>${b?b.apelido:'-'}</small></td>
+          <td><small class="vd">${l.contaD}</small></td>
+          <td><small class="vc">${l.contaC}</small></td>
+          <td>${R$(l.valor)}</td>
+          <td><small>${l.hist||''}</small></td>
+          <td>${l.conciliado?'<span class="badge bg-success">Sim</span>':'<span class="badge bg-warning text-dark">Não</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`}
+  </div>`;
+}
+</script>
+<script>
+// ============================================================
+// VIEW: IMPORTAÇÃO
+// ============================================================
+function renderImport(){
+  const empOpts=DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  return`
+  <div class="ph"><div><h2>📥 Importação de Extratos</h2><p>Importe OFX, Excel ou PDF de um ou mais bancos</p></div></div>
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="sc mb-3">
+        <h6>1. Selecione a Empresa e Banco</h6>
+        <div class="mb-3">
+          <label class="form-label">Empresa *</label>
+          <select id="impEmp" class="form-select" onchange="loadImpBancos()">
+            <option value="">Selecione a empresa...</option>${empOpts}
+          </select>
+        </div>
+        <div id="impBancosArea" class="mb-3">
+          <label class="form-label">Banco</label>
+          <select id="impBanco" class="form-select"><option value="">Selecione a empresa primeiro</option></select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tipo de Arquivo</label>
+          <select id="impTipo" class="form-select">
+            <option value="ofx">OFX (extrato bancário)</option>
+            <option value="excel">Excel / CSV</option>
+            <option value="pdf">PDF (extrato bancário)</option>
+          </select>
+        </div>
+      </div>
+      <div class="sc">
+        <h6>2. Carregue o Arquivo</h6>
+        <div class="uz" id="dropArea" onclick="document.getElementById('fileInp').click()"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="handleDrop(event)">
+          <i class="bi bi-cloud-upload"></i>
+          <p><strong>Clique ou arraste o arquivo</strong></p>
+          <p style="font-size:.75rem;color:#94a3b8">OFX · XLSX · XLS · CSV · PDF</p>
+        </div>
+        <input type="file" id="fileInp" class="d-none" accept=".ofx,.xlsx,.xls,.csv,.pdf" onchange="handleFile(this.files[0])">
+        <div id="impStatus" class="mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="dt">
+        <div class="dth"><h5>3. Prévia das Transações</h5>
+          <div class="d-flex gap-2">
+            <span id="previewCount" class="badge bg-secondary">0 transações</span>
+            <button class="btn btn-success btn-sm" id="btnConfirmar" onclick="confirmarImport()" style="display:none">
+              <i class="bi bi-check-lg me-1"></i>Confirmar e Lançar
+            </button>
+          </div>
+        </div>
+        <div id="previewBody">
+          <div class="empty-state"><div class="icon">📂</div><p>Carregue um arquivo para visualizar as transações</p></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function loadImpBancos(){
+  const empId=document.getElementById('impEmp').value;
+  const sel=document.getElementById('impBanco');
+  if(!empId){sel.innerHTML='<option value="">Selecione a empresa primeiro</option>';return;}
+  const bcs=getBancos(empId);
+  sel.innerHTML='<option value="">Todos os bancos / Sem banco</option>'+
+    bcs.map(b=>`<option value="${b.id}">${b.apelido} - ${b.banco}</option>`).join('');
+}
+
+async function handleFile(file){
+  if(!file)return;
+  const empId=document.getElementById('impEmp').value;
+  if(!empId){toast('Selecione uma empresa primeiro','warning');return;}
+  const tipo=document.getElementById('impTipo').value;
+  const st=document.getElementById('impStatus');
+  st.innerHTML=`<div class="text-primary small"><i class="bi bi-hourglass-split me-1"></i>Processando ${file.name}...</div>`;
+  try{
+    const buf=await file.arrayBuffer();
+    let result;
+    if(tipo==='ofx'){
+      const txt=new TextDecoder('iso-8859-1').decode(buf);
+      result=parseOFX(txt);
+    } else if(tipo==='excel'){
+      result=parseExcel(new Uint8Array(buf));
+    } else {
+      result=await parsePDF(new Uint8Array(buf));
+    }
+    _importPreview=result.transactions;
+    _importEmpId=empId;
+    _importBancoId=document.getElementById('impBanco').value||null;
+    // Guarda o arquivo original na pasta "Extratos Importados", pro histórico/auditoria
+    const emp=getEmp(empId);
+    const cnpjSlug=(emp?.cnpj||'sem-cnpj').replace(/[^0-9]/g,'')||'sem-cnpj';
+    const nomeArquivo=`${new Date().toISOString().slice(0,10)}_${cnpjSlug}_${file.name}`.replace(/[\\/:*?"<>|]/g,'-');
+    xlUploadFile(nomeArquivo, buf, file.type||'application/octet-stream')
+      .catch(err=>{ console.error('Falha ao salvar extrato original:', err); toast('Aviso: não foi possível guardar o arquivo original no OneDrive ('+err.message+')','warning'); });
+    st.innerHTML=`<div class="text-success small"><i class="bi bi-check-circle me-1"></i>${_importPreview.length} transações encontradas em ${file.name}</div>`;
+    renderPreview(empId);
+  } catch(err){
+    st.innerHTML=`<div class="text-danger small"><i class="bi bi-x-circle me-1"></i>Erro: ${err.message}</div>`;
+  }
+}
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropArea').classList.remove('drag-over');
+  const file=e.dataTransfer.files[0];
+  if(file) handleFile(file);
+}
+
+function renderPreview(empId){
+  const contas=getContasAnaliticas(empId);
+  const cOpts=contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
+  // auto-classify
+  _importPreview.forEach(t=>{if(!t.contaD)autoClassify(t,empId);});
+  const body=document.getElementById('previewBody');
+  const count=document.getElementById('previewCount');
+  count.textContent=`${_importPreview.length} transações`;
+  if(_importPreview.length===0){body.innerHTML='<div class="empty-state py-3"><p>Nenhuma transação encontrada</p></div>';return;}
+  document.getElementById('btnConfirmar').style.display='';
+  body.innerHTML=`<div class="table-responsive" style="max-height:400px;overflow-y:auto">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Conta D</th><th>Conta C</th></tr></thead>
+      <tbody>
+        ${_importPreview.map((t,i)=>`<tr class="${t.contaD&&t.contaC?'':'table-warning'}">
+          <td><small>${fmtDate(t.data)}</small></td>
+          <td><span class="${t.tipo==='C'?'vc':'vd'}">${t.tipo==='C'?'Entrada':'Saída'}</span></td>
+          <td>${R$(t.valor)}</td>
+          <td><small title="${t.descricao}">${t.descricao.slice(0,30)}${t.descricao.length>30?'...':''}</small></td>
+          <td><select class="form-select form-select-sm" style="min-width:140px" onchange="_importPreview[${i}].contaD=this.value">
+            <option value="">Selecione...</option>${cOpts.replace(`value="${t.contaD||''}"`,`value="${t.contaD||''}" selected`)}
+          </select></td>
+          <td><select class="form-select form-select-sm" style="min-width:140px" onchange="_importPreview[${i}].contaC=this.value">
+            <option value="">Selecione...</option>${cOpts.replace(`value="${t.contaC||''}"`,`value="${t.contaC||''}" selected`)}
+          </select></td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+async function confirmarImport(){
+  const empId=_importEmpId;
+  const bancoId=_importBancoId;
+  if(!empId){toast('Empresa não selecionada','danger');return;}
+  // Find unclassified
+  const unclass=_importPreview.filter(t=>!t.contaD||!t.contaC);
+  // Add classified ones to lancamentos
+  const classified=_importPreview.filter(t=>t.contaD&&t.contaC);
+  let erros=0;
+  for(const t of classified){
+    const novo={
+      id:uid(),empId,bancoId,data:t.data,
+      contaD:t.contaD,contaC:t.contaC,
+      valor:t.valor,hist:t.hist||t.descricao,
+      codHist:t.codHist||'',doc:t.doc||'',
+      origem:t.origem,conciliado:false
+    };
+    try{ await xlAddRow('Lancamentos', lancToRow(novo)); }
+    catch(err){ erros++; console.error(err); continue; }
+    DB.lancamentos.push(novo);
+    DB.movimentos.push({...t,empId,bancoId});
+  }
+  if(erros>0) toast(`${erros} lançamento(s) não puderam ser gravados no Excel — veja o console.`,'danger');
+  if(unclass.length>0){
+    _classQueue=unclass; _classIdx=0; _classEmpId=empId;
+    toast(`${classified.length-erros} lançados. Classificando ${unclass.length} não identificados...`,'warning');
+    openClassModal();
+  } else {
+    toast(`${classified.length-erros} lançamentos registrados com sucesso!`);
+    _importPreview=[];
+    go('lanc');
+  }
+}
+
+// ============================================================
+// VIEW: LANÇAMENTOS
+// ============================================================
+function renderLanc(){
+  const empOpts='<option value="">Todas</option>'+DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  return`
+  <div class="ph"><div><h2>📄 Lançamentos Contábeis</h2><p>Todos os lançamentos registrados</p></div>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#mLanc"><i class="bi bi-plus-lg me-1"></i>Lançamento Manual</button>
+  </div>
+  <div class="sc mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Empresa</label>
+        <select id="filtEmp" class="form-select" onchange="renderLancTable()">${empOpts}</select>
+      </div>
+      <div class="col-md-2"><label class="form-label">De</label>
+        <input type="date" id="filtDe" class="form-control" onchange="renderLancTable()"></div>
+      <div class="col-md-2"><label class="form-label">Até</label>
+        <input type="date" id="filtAte" class="form-control" onchange="renderLancTable()"></div>
+      <div class="col-md-3"><label class="form-label">Buscar</label>
+        <input type="text" id="filtBusca" class="form-control" placeholder="Histórico, conta..." oninput="renderLancTable()"></div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary btn-sm w-100" onclick="limparFiltros()"><i class="bi bi-x-circle me-1"></i>Limpar</button>
+      </div>
+    </div>
+  </div>
+  <div class="dt"><div class="dth"><h5>Registros</h5><span id="lancCount" class="badge bg-secondary">0</span></div>
+    <div id="lancTable"></div>
+  </div>`;
+}
+
+function renderLancTable(){
+  const empId=document.getElementById('filtEmp')?.value||'';
+  const de=document.getElementById('filtDe')?.value||'';
+  const ate=document.getElementById('filtAte')?.value||'';
+  const busca=(document.getElementById('filtBusca')?.value||'').toLowerCase();
+  let data=DB.lancamentos.filter(l=>{
+    if(empId&&l.empId!==empId)return false;
+    if(de&&l.data<de)return false;
+    if(ate&&l.data>ate)return false;
+    if(busca&&!`${l.contaD} ${l.contaC} ${l.hist||''} ${l.doc||''}`.toLowerCase().includes(busca))return false;
+    return true;
+  }).reverse();
+  const cnt=document.getElementById('lancCount');
+  if(cnt)cnt.textContent=data.length;
+  const el=document.getElementById('lancTable');
+  if(!el)return;
+  if(data.length===0){el.innerHTML='<div class="empty-state py-4"><p>Nenhum lançamento encontrado</p></div>';return;}
+  el.innerHTML=`<div class="table-responsive"><table class="table table-hover table-sm mb-0">
+    <thead><tr><th>Data</th><th>Empresa</th><th>Banco</th><th>Conta Débito</th><th>Conta Crédito</th><th>Valor</th><th>Histórico</th><th>Doc</th><th>Origem</th><th>Concil.</th><th></th></tr></thead>
+    <tbody>${data.map(l=>{
+      const e=getEmp(l.empId);
+      const b=l.bancoId?DB.bancos.find(b=>b.id===l.bancoId):null;
+      return`<tr>
+        <td><small>${fmtDate(l.data)}</small></td>
+        <td><small>${e?e.nome:'-'}</small></td>
+        <td><small>${b?b.apelido:'-'}</small></td>
+        <td><small class="vd">${l.contaD}</small></td>
+        <td><small class="vc">${l.contaC}</small></td>
+        <td><strong>${R$(l.valor)}</strong></td>
+        <td><small title="${l.hist||''}">${(l.hist||'').slice(0,30)}</small></td>
+        <td><small>${l.doc||'-'}</small></td>
+        <td><span class="badge bg-light text-muted">${l.origem||'-'}</span></td>
+        <td>${l.conciliado?'<span class="badge bg-success">Sim</span>':'<span class="badge bg-warning text-dark">Não</span>'}</td>
+        <td><button class="btn btn-xs btn-outline-danger" style="padding:1px 5px;font-size:.7rem" onclick="delLanc('${l.id}')"><i class="bi bi-trash"></i></button></td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+}
+
+function limparFiltros(){
+  ['filtEmp','filtDe','filtAte','filtBusca'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  renderLancTable();
+}
+
+function initLancModal(){
+  const empSel=document.getElementById('mlEmp');
+  if(!empSel)return;
+  empSel.innerHTML='<option value="">Selecione...</option>'+DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('mlData').value=today;
+}
+
+function loadLancContas(){
+  const empId=document.getElementById('mlEmp').value;
+  const bancSel=document.getElementById('mlBanco');
+  const dbSel=document.getElementById('mlDebito');
+  const crSel=document.getElementById('mlCredito');
+  const bcs=empId?getBancos(empId):[];
+  bancSel.innerHTML='<option value="">Sem banco</option>'+bcs.map(b=>`<option value="${b.id}">${b.apelido}</option>`).join('');
+  const contas=empId?getContasAnaliticas(empId):[];
+  const opts='<option value="">Selecione...</option>'+contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
+  dbSel.innerHTML=opts; crSel.innerHTML=opts;
+}
+
+async function saveLanc(){
+  const empId=document.getElementById('mlEmp').value;
+  const data=document.getElementById('mlData').value;
+  const contaD=document.getElementById('mlDebito').value;
+  const contaC=document.getElementById('mlCredito').value;
+  const valor=parseFloat(document.getElementById('mlValor').value);
+  if(!empId||!data||!contaD||!contaC||isNaN(valor)||valor<=0){
+    toast('Preencha todos os campos obrigatórios','danger');return;
+  }
+  const novo={
+    id:uid(),empId,bancoId:document.getElementById('mlBanco').value||null,
+    data,contaD,contaC,valor,
+    hist:document.getElementById('mlHist').value,
+    codHist:document.getElementById('mlCodH').value,
+    doc:document.getElementById('mlDoc').value,
+    origem:document.getElementById('mlOrigem').value,
+    conciliado:false
+  };
+  try{ await xlAddRow('Lancamentos', lancToRow(novo)); }
+  catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  DB.lancamentos.push(novo);
+  bootstrap.Modal.getInstance(document.getElementById('mLanc'))?.hide();
+  toast('Lançamento registrado!');
+  if(_view==='lanc') renderLancTable();
+}
+
+async function delLanc(id){
+  if(!confirm('Excluir este lançamento?'))return;
+  try{ await xlDeleteRowById('Lancamentos', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  DB.lancamentos=DB.lancamentos.filter(l=>l.id!==id);
+  renderLancTable();
+  toast('Lançamento excluído','warning');
+}
+
+// ============================================================
+// VIEW: CONCILIAÇÃO BANCÁRIA
+// ============================================================
+function renderConcil(){
+  const empOpts=DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  return`
+  <div class="ph"><div><h2>✅ Conciliação Bancária</h2><p>Conciliar saldo contábil × extrato bancário</p></div></div>
+  <div class="sc mb-3">
+    <h6>Parâmetros</h6>
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3"><label class="form-label">Empresa *</label>
+        <select id="cEmp" class="form-select" onchange="loadConcilBancos()">
+          <option value="">Selecione...</option>${empOpts}
+        </select>
+      </div>
+      <div class="col-md-3"><label class="form-label">Banco</label>
+        <select id="cBanco" class="form-select"><option value="">Todos</option></select>
+      </div>
+      <div class="col-md-2"><label class="form-label">Período De</label>
+        <input type="date" id="cDe" class="form-control" value="${new Date().toISOString().slice(0,8)}01"></div>
+      <div class="col-md-2"><label class="form-label">Até</label>
+        <input type="date" id="cAte" class="form-control" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="col-md-2">
+        <button class="btn btn-primary w-100" onclick="runConcil()"><i class="bi bi-play-fill me-1"></i>Conciliar</button>
+      </div>
+    </div>
+  </div>
+  <div id="concilResult">
+    <div class="empty-state"><div class="icon">🔍</div><p>Selecione os parâmetros e clique em Conciliar</p></div>
+  </div>`;
+}
+
+function loadConcilBancos(){
+  const empId=document.getElementById('cEmp').value;
+  const sel=document.getElementById('cBanco');
+  sel.innerHTML='<option value="">Todos</option>'+getBancos(empId).map(b=>`<option value="${b.id}">${b.apelido}</option>`).join('');
+}
+
+function runConcil(){
+  const empId=document.getElementById('cEmp').value;
+  const bancoId=document.getElementById('cBanco').value;
+  const de=document.getElementById('cDe').value;
+  const ate=document.getElementById('cAte').value;
+  if(!empId){toast('Selecione uma empresa','warning');return;}
+
+  const emp=getEmp(empId);
+  // Get accounting entries for period
+  let lancs=DB.lancamentos.filter(l=>l.empId===empId);
+  if(bancoId) lancs=lancs.filter(l=>l.bancoId===bancoId);
+  if(de) lancs=lancs.filter(l=>l.data>=de);
+  if(ate) lancs=lancs.filter(l=>l.data<=ate);
+
+  // Get bank movements for period
+  let movs=DB.movimentos.filter(m=>m.empId===empId);
+  if(bancoId) movs=movs.filter(m=>m.bancoId===bancoId);
+  if(de) movs=movs.filter(m=>m.data>=de);
+  if(ate) movs=movs.filter(m=>m.data<=ate);
+
+  // Group by date for daily reconciliation
+  const dates=new Set([...lancs.map(l=>l.data),...movs.map(m=>m.data)].filter(Boolean));
+  const sortedDates=[...dates].sort();
+
+  const rows=sortedDates.map(date=>{
+    const dayLancs=lancs.filter(l=>l.data===date);
+    const dayMovs=movs.filter(m=>m.data===date);
+    const saldoContabil=dayLancs.reduce((s,l)=>{
+      const c=getContasAnaliticas(empId).find(c=>c.codigo===l.contaC);
+      return s+(c&&c.natureza==='C'?l.valor:-l.valor);
+    },0);
+    const saldoBanco=dayMovs.reduce((s,m)=>s+(m.tipo==='C'?m.valor:-m.valor),0);
+    const dif=Math.abs(saldoContabil-saldoBanco);
+    const ok=dif<0.01;
+    return{date,dayLancs,dayMovs,saldoContabil,saldoBanco,dif,ok};
+  });
+
+  const pendentes=lancs.filter(l=>!l.conciliado);
+  // Mark as conciliado
+  lancs.forEach(l=>l.conciliado=true);
+
+  const result=document.getElementById('concilResult');
+  result.innerHTML=`
+  <div class="row g-3 mb-3">
+    <div class="col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#f0fdf4">📄</div>
+      <h3>${lancs.length}</h3><p>Lançamentos no período</p>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#eff6ff">🏦</div>
+      <h3>${movs.length}</h3><p>Movimentos bancários</p>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#f0fdf4">✅</div>
+      <h3>${rows.filter(r=>r.ok).length}</h3><p>Dias conciliados</p>
+    </div></div>
+    <div class="col-md-3"><div class="stat-card">
+      <div class="stat-icon" style="background:#fff7ed">⚠️</div>
+      <h3 class="${rows.filter(r=>!r.ok).length>0?'text-warning':''}">${rows.filter(r=>!r.ok).length}</h3><p>Dias com divergência</p>
+    </div></div>
+  </div>
+  <div class="dt">
+    <div class="dth"><h5>Conciliação Diária</h5>
+      ${pendentes.length>0?`<button class="btn btn-warning btn-sm" onclick="classifyPending('${empId}')"><i class="bi bi-exclamation-triangle me-1"></i>Classificar ${pendentes.length} pendentes</button>`:''}
+    </div>
+    ${rows.length===0?`<div class="empty-state py-3"><p>Nenhum dado no período selecionado</p></div>`:`
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Data</th><th>Lanç. Contábeis</th><th>Saldo Contábil</th><th>Movimentos Banco</th><th>Saldo Banco</th><th>Diferença</th><th>Status</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr class="${r.ok?'':r.dif<10?'table-warning':'table-danger'}">
+        <td><strong>${fmtDate(r.date)}</strong></td>
+        <td>${r.dayLancs.length}</td>
+        <td>${R$(r.saldoContabil)}</td>
+        <td>${r.dayMovs.length}</td>
+        <td>${R$(r.saldoBanco)}</td>
+        <td class="${r.ok?'text-success':r.dif<10?'text-warning':'text-danger'}">${r.ok?'—':R$(r.dif)}</td>
+        <td>${r.ok?'<span class="badge bg-success">✓ OK</span>':r.dif<10?'<span class="badge bg-warning text-dark">Diferença pequena</span>':'<span class="badge bg-danger">Divergente</span>'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`}
+  </div>`;
+}
+
+function classifyPending(empId){
+  const pendentes=DB.lancamentos.filter(l=>l.empId===empId&&!l.conciliado);
+  if(pendentes.length===0){toast('Nenhum lançamento pendente');return;}
+  _classQueue=pendentes.map(l=>({...l,_isLanc:true}));
+  _classIdx=0; _classEmpId=empId;
+  openClassModal();
+}
+
+// ============================================================
+// VIEW: RAZÃO / APRENDIZADO
+// ============================================================
+function renderRazao(){
+  const empOpts=DB.empresas.map(e=>`<option value="${e.id}" ${e.isNova?'disabled':''} title="${e.isNova?'Cliente novo - sem razão':''}">${e.nome}${e.isNova?' (Novo)':''}</option>`).join('');
+  return`
+  <div class="ph"><div><h2>📖 Razão / Aprendizado</h2><p>Importe o razão anterior para que o sistema aprenda a classificação das contas</p></div></div>
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="sc mb-3">
+        <h6>Importar Razão Anterior</h6>
+        <div class="alert alert-info py-2 mb-3" style="font-size:.82rem">
+          <i class="bi bi-info-circle me-1"></i>
+          Exclusivo para <strong>clientes existentes</strong>. O sistema lerá o razão e aprenderá como cada tipo de lançamento deve ser classificado.
+        </div>
+        <div class="mb-3"><label class="form-label">Empresa *</label>
+          <select id="razEmp" class="form-select">
+            <option value="">Selecione a empresa...</option>${empOpts}
+          </select>
+          <div id="razEmpWarn" class="mt-1" style="font-size:.78rem;color:#ef4444"></div>
+        </div>
+        <div class="mb-3"><label class="form-label">Tipo do Arquivo</label>
+          <select id="razTipo" class="form-select">
+            <option value="excel">Excel / CSV</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </div>
+        <div class="uz" id="razDrop" onclick="document.getElementById('razFile').click()"
+          ondragover="event.preventDefault();this.classList.add('drag-over')"
+          ondragleave="this.classList.remove('drag-over')"
+          ondrop="handleRazDrop(event)">
+          <i class="bi bi-book"></i>
+          <p><strong>Clique para carregar o Razão</strong></p>
+          <p style="font-size:.75rem;color:#94a3b8">Excel (.xlsx .xls) ou PDF</p>
+        </div>
+        <input type="file" id="razFile" class="d-none" accept=".xlsx,.xls,.csv,.pdf" onchange="processRazao(this.files[0])">
+        <div id="razStatus" class="mt-2"></div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="dt">
+        <div class="dth"><h5>Regras de Classificação Aprendidas</h5>
+          <span class="badge bg-secondary">${DB.regras.length} regras</span>
+        </div>
+        ${DB.regras.length===0?`<div class="empty-state py-4">
+          <div class="icon">🧠</div>
+          <p>Nenhuma regra aprendida ainda</p>
+          <small class="text-muted">Importe um razão ou classifique lançamentos manualmente</small>
+        </div>`:`
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Empresa</th><th>Padrão (Descrição)</th><th>Conta Débito</th><th>Conta Crédito</th><th>Histórico</th><th></th></tr></thead>
+          <tbody>${DB.regras.map((r,i)=>{
+            const e=getEmp(r.empId);
+            return`<tr>
+              <td><small>${e?e.nome:'-'}</small></td>
+              <td><code style="font-size:.75rem">${r.pattern}</code></td>
+              <td><small class="vd">${r.contaD}</small></td>
+              <td><small class="vc">${r.contaC}</small></td>
+              <td><small>${r.hist||'-'}</small></td>
+              <td><button class="btn btn-xs btn-outline-danger" style="padding:1px 5px;font-size:.7rem" onclick="delRegra(${i})"><i class="bi bi-trash"></i></button></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`}
+      </div>
+    </div>
+  </div>`;
+}
+
+async function processRazao(file){
+  if(!file)return;
+  const empId=document.getElementById('razEmp').value;
+  const emp=getEmp(empId);
+  const st=document.getElementById('razStatus');
+  if(!empId){toast('Selecione a empresa','warning');return;}
+  if(emp&&emp.isNova){
+    document.getElementById('razEmpWarn').textContent='Cliente novo — não é necessário importar razão.';
+    return;
+  }
+  st.innerHTML=`<div class="text-primary small"><i class="bi bi-hourglass-split me-1"></i>Processando razão...</div>`;
+  try{
+    const buf=await file.arrayBuffer();
+    const tipo=document.getElementById('razTipo').value;
+    let rows=[];
+    if(tipo==='excel'){
+      const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    } else {
+      const res=await parsePDF(new Uint8Array(buf));
+      rows=res.rawText.split('\n').map(l=>[l]);
+    }
+    // Extract patterns: look for description + conta debito + conta credito
+    let learned=0, erros=0;
+    for(const row of rows){
+      if(!row||!row[0])continue;
+      // Try columns: hist/desc, contaD, contaC
+      const desc=String(row[0]||row[1]||'').trim();
+      const cd=String(row[2]||row[3]||'').trim();
+      const cc=String(row[3]||row[4]||'').trim();
+      if(desc.length>3&&cd.match(/\d+\.\d+/)&&cc.match(/\d+\.\d+/)){
+        const pattern=desc.slice(0,30).toLowerCase();
+        if(!DB.regras.find(r=>r.empId===empId&&r.pattern===pattern)){
+          const novaRegra={id:uid(),empId,pattern,contaD:cd,contaC:cc,hist:desc,codHist:''};
+          try{
+            await xlAddRow('Regras', regraToRow(novaRegra));
+            DB.regras.push(novaRegra);
+            learned++;
+          }catch(err){ erros++; console.error(err); }
+        }
+      }
+    }
+    if(erros>0) toast(`${erros} regra(s) não puderam ser gravadas no Excel — veja o console.`,'danger');
+    if(emp) emp.razaoImportada=true;
+    st.innerHTML=`<div class="text-success small"><i class="bi bi-check-circle me-1"></i>${learned} regras aprendidas de ${file.name}</div>`;
+    toast(`${learned} regras aprendidas do razão!`);
+    go('razao');
+  } catch(err){
+    st.innerHTML=`<div class="text-danger small">Erro: ${err.message}</div>`;
+  }
+}
+
+function handleRazDrop(e){
+  e.preventDefault();
+  document.getElementById('razDrop').classList.remove('drag-over');
+  processRazao(e.dataTransfer.files[0]);
+}
+
+async function delRegra(i){
+  const reg=DB.regras[i];
+  if(reg){ try{ await xlDeleteRowById('Regras', reg.id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; } }
+  DB.regras.splice(i,1);
+  go('razao');
+  toast('Regra removida','warning');
+}
+
+// ============================================================
+// VIEW: EXPORTAÇÃO DOMÍNIO
+// ============================================================
+function renderExport(){
+  const empOpts=DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
+  const hoje=new Date().toISOString().slice(0,10);
+  const primDia=hoje.slice(0,8)+'01';
+  return`
+  <div class="ph"><div><h2>📤 Exportar Domínio</h2><p>Gera arquivo TXT no layout de importação do Domínio Sistemas</p></div></div>
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="sc mb-3">
+        <h6>Parâmetros de Exportação</h6>
+        <div class="mb-3"><label class="form-label">Empresa *</label>
+          <select id="expEmp" class="form-select" onchange="previewDominio()">
+            <option value="">Selecione...</option>${empOpts}
+          </select>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6"><label class="form-label">Período De</label>
+            <input type="date" id="expDe" class="form-control" value="${primDia}" onchange="previewDominio()"></div>
+          <div class="col-6"><label class="form-label">Até</label>
+            <input type="date" id="expAte" class="form-control" value="${hoje}" onchange="previewDominio()"></div>
+        </div>
+        <div class="mb-3"><label class="form-label">Usuário (para cabeçalho)</label>
+          <input type="text" id="expUser" class="form-control" value="Lucralize" placeholder="Nome do usuário"></div>
+        <button class="btn btn-success w-100" onclick="gerarDominio()">
+          <i class="bi bi-file-earmark-arrow-down me-2"></i>Gerar Arquivo Domínio (.txt)
+        </button>
+        <div class="mt-2">
+          <div class="alert alert-secondary py-2 mb-0" style="font-size:.78rem">
+            <strong>Layout:</strong> Tipo;Data;Conta Débito;Conta Crédito;Valor;Cód.Hist;Histórico;Nº Doc<br>
+            Separador: ponto-e-vírgula. Decimal: vírgula (BR).
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="dt">
+        <div class="dth"><h5>Prévia do Arquivo</h5><span id="expCount" class="badge bg-secondary">0 registros</span></div>
+        <div id="expPreview" style="background:#1a2332;color:#a3e635;font-family:monospace;font-size:.75rem;padding:16px;max-height:400px;overflow-y:auto;border-radius:0 0 10px 10px">
+          <div class="text-muted">Selecione a empresa para visualizar...</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildDominioLines(empId,de,ate,user){
+  const emp=getEmp(empId);
+  if(!emp)return[];
+  let lancs=DB.lancamentos.filter(l=>l.empId===empId);
+  if(de)lancs=lancs.filter(l=>l.data>=de);
+  if(ate)lancs=lancs.filter(l=>l.data<=ate);
+  lancs.sort((a,b)=>a.data.localeCompare(b.data));
+  const mes=de?`${de.slice(5,7)}/${de.slice(0,4)}`:`${new Date().toLocaleDateString('pt-BR',{month:'2-digit',year:'numeric'})}`;
+  const lines=[`1;${emp.cnpj||'00.000.000/0001-00'};${mes};${user||'Lucralize'}`];
+  lancs.forEach(l=>{
+    lines.push(`2;${fmtDateExport(l.data)};${l.contaD};${l.contaC};${fmtBR(l.valor)};${l.codHist||''};${(l.hist||'').replace(/;/g,' ')};${l.doc||''}`);
+  });
+  return{lines,count:lancs.length};
+}
+
+function previewDominio(){
+  const empId=document.getElementById('expEmp')?.value;
+  const de=document.getElementById('expDe')?.value;
+  const ate=document.getElementById('expAte')?.value;
+  const user=document.getElementById('expUser')?.value;
+  const el=document.getElementById('expPreview');
+  const cnt=document.getElementById('expCount');
+  if(!el||!cnt)return;
+  if(!empId){el.innerHTML='<div class="text-muted">Selecione a empresa...</div>';return;}
+  const {lines,count}=buildDominioLines(empId,de,ate,user);
+  cnt.textContent=`${count} registros`;
+  el.innerHTML=lines.slice(0,50).map(l=>`<div>${l}</div>`).join('')+(lines.length>50?`<div class="text-muted">... e mais ${lines.length-50} linhas</div>`:'');
+}
+
+function gerarDominio(){
+  const empId=document.getElementById('expEmp')?.value;
+  const de=document.getElementById('expDe')?.value;
+  const ate=document.getElementById('expAte')?.value;
+  const user=document.getElementById('expUser')?.value;
+  if(!empId){toast('Selecione a empresa','warning');return;}
+  const {lines,count}=buildDominioLines(empId,de,ate,user);
+  if(count===0){toast('Nenhum lançamento no período','warning');return;}
+  const content=lines.join('\r\n');
+  const blob=new Blob([content],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const emp=getEmp(empId);
+  a.href=url;
+  a.download=`dominio_${(emp.nome||'empresa').replace(/\s/g,'_')}_${de||'periodo'}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast(`Arquivo gerado com ${count} lançamentos!`);
+}
+</script>
+<script>
+// ============================================================
+// ACTIONS: PLANO DE CONTAS
+// ============================================================
+async function saveTpl(){
+  const nome=document.getElementById('tplNome')?.value?.trim();
+  const desc=document.getElementById('tplDesc')?.value?.trim();
+  if(!nome){toast('Informe o nome do template','danger');return;}
+  _tplEdit.nome=nome; _tplEdit.descricao=desc||'';
+  const idx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
+  try{
+    if(idx>=0) await xlUpdateRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit));
+    else await xlAddRow('PlanoContas', tplToRow(_tplEdit));
+  }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  if(idx>=0) DB.templates[idx]=_tplEdit;
+  else DB.templates.push(_tplEdit);
+  toast('Template salvo!');
+  go('plano');
+}
+
+async function delTpl(id){
+  if(DB.empresas.some(e=>e.planoId===id)){toast('Não é possível excluir: template vinculado a empresas','danger');return;}
+  if(!confirm('Excluir este template?'))return;
+  try{ await xlDeleteRowById('PlanoContas', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  DB.templates=DB.templates.filter(t=>t.id!==id);
+  toast('Template excluído','warning');
+  go('plano');
+}
+
+function importContasPadrao(){
+  if(!_tplEdit)return;
+  if(_tplEdit.contas.length>0&&!confirm('Isso substituirá as contas atuais. Continuar?'))return;
+  _tplEdit.contas=getContasPadrao();
+  document.getElementById('contasBody').innerHTML=renderContasRows();
+  toast('Contas padrão importadas!');
+}
+
+function openContaModal(idx){
+  document.getElementById('mContaTit').textContent=idx>=0?'Editar Conta':'Nova Conta';
+  document.getElementById('mcIdx').value=idx;
+  if(idx>=0&&_tplEdit){
+    const c=_tplEdit.contas[idx];
+    document.getElementById('mcCod').value=c.codigo;
+    document.getElementById('mcNome').value=c.nome;
+    document.getElementById('mcTipo').value=c.tipo;
+    document.getElementById('mcNat').value=c.natureza;
+    document.getElementById('mcNiv').value=c.nivel;
+    document.getElementById('mcHP').value=c.hp||'';
+    document.getElementById('mcCH').value=c.ch||'';
+  } else {
+    ['mcCod','mcNome','mcHP','mcCH'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mcNiv').value='4';
+  }
+  new bootstrap.Modal(document.getElementById('mConta')).show();
+}
+
+async function saveConta(){
+  if(!_tplEdit)return;
+  const idx=parseInt(document.getElementById('mcIdx').value);
+  const c={
+    codigo:document.getElementById('mcCod').value.trim(),
+    nome:document.getElementById('mcNome').value.trim(),
+    tipo:document.getElementById('mcTipo').value,
+    natureza:document.getElementById('mcNat').value,
+    nivel:parseInt(document.getElementById('mcNiv').value),
+    aceita:parseInt(document.getElementById('mcNiv').value)===4,
+    hp:document.getElementById('mcHP').value.trim(),
+    ch:parseInt(document.getElementById('mcCH').value)||0
+  };
+  if(!c.codigo||!c.nome){toast('Código e nome são obrigatórios','danger');return;}
+  const backup=_tplEdit.contas.slice();
+  if(idx>=0) _tplEdit.contas[idx]=c;
+  else _tplEdit.contas.push(c);
+  // Sort by codigo
+  _tplEdit.contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
+  try{ await xlUpdateRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
+  catch(err){ _tplEdit.contas=backup; toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  const tplIdx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
+  if(tplIdx>=0) DB.templates[tplIdx]=_tplEdit;
+  document.getElementById('contasBody').innerHTML=renderContasRows();
+  bootstrap.Modal.getInstance(document.getElementById('mConta'))?.hide();
+  toast('Conta salva!');
+}
+
+async function delConta(idx){
+  if(!_tplEdit||!confirm('Excluir esta conta?'))return;
+  const backup=_tplEdit.contas.slice();
+  _tplEdit.contas.splice(idx,1);
+  try{ await xlUpdateRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
+  catch(err){ _tplEdit.contas=backup; toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  const tplIdx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
+  if(tplIdx>=0) DB.templates[tplIdx]=_tplEdit;
+  document.getElementById('contasBody').innerHTML=renderContasRows();
+  toast('Conta excluída','warning');
+}
+
+// ============================================================
+// ACTIONS: EMPRESA
+// ============================================================
+function toggleNova(){
+  const isNova=document.getElementById('eNova').checked;
+  document.getElementById('novaInfo').classList.toggle('d-none',!isNova);
+  document.getElementById('existInfo').classList.toggle('d-none',isNova);
+}
+
+async function saveEmp(id,mode){
+  const nome=document.getElementById('eNome')?.value?.trim();
+  const planoId=document.getElementById('ePlano')?.value;
+  const dataEntrada=document.getElementById('eData')?.value;
+  if(!nome||!planoId||!dataEntrada){toast('Nome, plano de contas e data de entrada são obrigatórios','danger');return;}
+  const data={
+    id,nome,
+    razao:document.getElementById('eRazao').value.trim(),
+    cnpj:document.getElementById('eCNPJ').value.trim(),
+    regime:document.getElementById('eRegime').value,
+    planoId,dataEntrada,
+    isNova:document.getElementById('eNova').checked,
+    obs:document.getElementById('eObs').value.trim(),
+    razaoImportada:false
+  };
+  try{
+    if(mode==='edit') await xlUpdateRowById('Empresas', id, empToRow(data));
+    else await xlAddRow('Empresas', empToRow(data));
+  }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  if(mode==='edit'){
+    const e=getEmp(id);
+    if(e) Object.assign(e,data);
+  } else {
+    DB.empresas.push(data);
+  }
+  toast(`Empresa ${mode==='edit'?'atualizada':'cadastrada'}!`);
+  go('emp-det',{id});
+}
+
+async function delEmp(id){
+  if(!confirm('Excluir esta empresa e todos seus dados? Isso remove também bancos, lançamentos e regras dela no Excel — pode demorar alguns segundos.'))return;
+  try{
+    for(const b of DB.bancos.filter(x=>x.empId===id)) await xlDeleteRowById('Bancos', b.id);
+    for(const l of DB.lancamentos.filter(x=>x.empId===id)) await xlDeleteRowById('Lancamentos', l.id);
+    for(const r of DB.regras.filter(x=>x.empId===id)) await xlDeleteRowById('Regras', r.id);
+    await xlDeleteRowById('Empresas', id);
+  }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  DB.empresas=DB.empresas.filter(e=>e.id!==id);
+  DB.bancos=DB.bancos.filter(b=>b.empId!==id);
+  DB.lancamentos=DB.lancamentos.filter(l=>l.empId!==id);
+  DB.movimentos=DB.movimentos.filter(m=>m.empId!==id);
+  DB.regras=DB.regras.filter(r=>r.empId!==id);
+  toast('Empresa excluída','warning');
+  go('empresas');
+}
+
+// ============================================================
+// ACTIONS: BANCO
+// ============================================================
+function openBancoModal(empId,bancoId){
+  document.getElementById('mBancoTit').textContent=bancoId?'Editar Banco':'Adicionar Banco';
+  document.getElementById('mbEmpId').value=empId;
+  document.getElementById('mbId').value=bancoId||'';
+  // Populate conta contabil options
+  const contas=getContasAnaliticas(empId);
+  const sel=document.getElementById('mbContabil');
+  sel.innerHTML='<option value="">Selecione...</option>'+contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
+  if(bancoId){
+    const b=DB.bancos.find(b=>b.id===bancoId);
+    if(b){
+      document.getElementById('mbBanco').value=b.banco;
+      document.getElementById('mbApel').value=b.apelido;
+      document.getElementById('mbAg').value=b.agencia||'';
+      document.getElementById('mbCta').value=b.conta||'';
+      document.getElementById('mbTipo').value=b.tipo||'CC';
+      sel.value=b.contabil||'';
+      document.getElementById('mbSaldo').value=b.saldo||0;
+      document.getElementById('mbDataSaldo').value=b.dataSaldo||'';
+    }
+  } else {
+    ['mbBanco','mbApel','mbAg','mbCta'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('mbSaldo').value=0;
+    document.getElementById('mbDataSaldo').value=new Date().toISOString().slice(0,10);
+  }
+  new bootstrap.Modal(document.getElementById('mBanco')).show();
+}
+
+async function saveBanco(){
+  const empId=document.getElementById('mbEmpId').value;
+  const existente=document.getElementById('mbId').value;
+  const id=existente||uid();
+  const banco=document.getElementById('mbBanco').value;
+  const apelido=document.getElementById('mbApel').value.trim();
+  if(!banco||!apelido){toast('Banco e apelido são obrigatórios','danger');return;}
+  const data={id,empId,banco,apelido,
+    agencia:document.getElementById('mbAg').value,
+    conta:document.getElementById('mbCta').value,
+    tipo:document.getElementById('mbTipo').value,
+    contabil:document.getElementById('mbContabil').value,
+    saldo:parseFloat(document.getElementById('mbSaldo').value)||0,
+    dataSaldo:document.getElementById('mbDataSaldo').value
+  };
+  try{
+    if(existente) await xlUpdateRowById('Bancos', id, bancoToRow(data));
+    else await xlAddRow('Bancos', bancoToRow(data));
+  }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  const idx=DB.bancos.findIndex(b=>b.id===id);
+  if(idx>=0) DB.bancos[idx]=data; else DB.bancos.push(data);
+  bootstrap.Modal.getInstance(document.getElementById('mBanco'))?.hide();
+  toast('Banco salvo!');
+  go('emp-det',{id:empId});
+}
+
+async function delBanco(id,empId){
+  if(!confirm('Excluir este banco?'))return;
+  try{ await xlDeleteRowById('Bancos', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  DB.bancos=DB.bancos.filter(b=>b.id!==id);
+  toast('Banco excluído','warning');
+  go('emp-det',{id:empId});
+}
+
+// ============================================================
+// MODAL: CLASSIFICAÇÃO AUTOMÁTICA (unidentified entries)
+// ============================================================
+let _classModalInst=null;
+
+function openClassModal(){
+  if(_classQueue.length===0)return;
+  const modal=document.getElementById('mClass');
+  _classModalInst=bootstrap.Modal.getOrCreateInstance(modal,{backdrop:'static'});
+  fillClassModal();
+  _classModalInst.show();
+}
+
+function fillClassModal(){
+  if(_classIdx>=_classQueue.length){
+    _classModalInst?.hide();
+    toast(`Todas as classificações concluídas! ${_classQueue.length} lançamentos processados.`);
+    go('lanc');
+    return;
+  }
+  const txn=_classQueue[_classIdx];
+  const empId=_classEmpId;
+  const total=_classQueue.length;
+  // Update counter
+  document.getElementById('mClassCount').textContent=`${_classIdx+1} / ${total}`;
+  // Transaction info
+  document.getElementById('mClassInfo').innerHTML=`
+    <div class="row g-2">
+      <div class="col-6"><small class="text-muted">Data</small><div class="fw-semibold">${fmtDate(txn.data)}</div></div>
+      <div class="col-6"><small class="text-muted">Tipo</small><div class="${txn.tipo==='C'?'vc':'vd'} fw-semibold">${txn.tipo==='C'?'💚 Entrada (Crédito)':'🔴 Saída (Débito)'}</div></div>
+      <div class="col-6"><small class="text-muted">Valor</small><div class="fw-semibold">${R$(txn.valor)}</div></div>
+      <div class="col-6"><small class="text-muted">Origem</small><div>${txn.origem||'-'}</div></div>
+      <div class="col-12"><small class="text-muted">Descrição</small><div class="fw-semibold">${txn.descricao||'-'}</div></div>
+    </div>`;
+  // Populate account selects
+  const contas=getContasAnaliticas(empId);
+  const opts='<option value="">Selecione...</option>'+contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
+  document.getElementById('mcDebito').innerHTML=opts;
+  document.getElementById('mcCredito').innerHTML=opts;
+  // Auto-suggest based on type
+  if(txn.tipo==='C'){
+    // Entry: D=Bank, C=Revenue
+    const bankConta=contas.find(c=>c.nome.toLowerCase().includes('banco'));
+    const revConta=contas.find(c=>c.tipo==='Receita');
+    if(bankConta) document.getElementById('mcDebito').value=bankConta.codigo;
+    if(revConta) document.getElementById('mcCredito').value=revConta.codigo;
+  } else {
+    // Exit: D=Expense, C=Bank
+    const bankConta=contas.find(c=>c.nome.toLowerCase().includes('banco'));
+    const expConta=contas.find(c=>c.tipo==='Despesa');
+    if(expConta) document.getElementById('mcDebito').value=expConta.codigo;
+    if(bankConta) document.getElementById('mcCredito').value=bankConta.codigo;
+  }
+  // Autofill history from description
+  document.getElementById('mcHist').value=txn.descricao?.slice(0,80)||'';
+  document.getElementById('mcCodHist').value=txn.codHist||'';
+  document.getElementById('mcDoc').value=txn.doc||'';
+  document.getElementById('mcSalvar').checked=true;
+}
+
+async function saveClass(){
+  const txn=_classQueue[_classIdx];
+  const contaD=document.getElementById('mcDebito').value;
+  const contaC=document.getElementById('mcCredito').value;
+  const hist=document.getElementById('mcHist').value;
+  const codHist=document.getElementById('mcCodHist').value;
+  const doc=document.getElementById('mcDoc').value;
+  const salvar=document.getElementById('mcSalvar').checked;
+  if(!contaD||!contaC){toast('Selecione conta débito e crédito','danger');return;}
+  try{
+    // Create/atualiza lancamento
+    const isLanc=txn._isLanc;
+    if(isLanc){
+      const l=DB.lancamentos.find(l=>l.id===txn.id);
+      if(l){
+        l.contaD=contaD;l.contaC=contaC;l.hist=hist;l.codHist=codHist;l.doc=doc;l.conciliado=true;
+        await xlUpdateRowById('Lancamentos', l.id, lancToRow(l));
+      }
+    } else {
+      const novo={
+        id:uid(),empId:_classEmpId,bancoId:_importBancoId||txn.bancoId||null,
+        data:txn.data,contaD,contaC,valor:txn.valor,hist,codHist,doc,
+        origem:txn.origem||'Import',conciliado:true
+      };
+      await xlAddRow('Lancamentos', lancToRow(novo));
+      DB.lancamentos.push(novo);
+    }
+    // Salva regra
+    if(salvar&&txn.descricao){
+      const pattern=txn.descricao.slice(0,30).toLowerCase().trim();
+      if(!DB.regras.find(r=>r.empId===_classEmpId&&r.pattern===pattern)){
+        const novaRegra={id:uid(),empId:_classEmpId,pattern,contaD,contaC,hist,codHist};
+        await xlAddRow('Regras', regraToRow(novaRegra));
+        DB.regras.push(novaRegra);
+      }
+    }
+  }catch(err){
+    toast('Erro ao salvar no Excel: '+err.message,'danger');
+    return;
+  }
+  _classIdx++;
+  fillClassModal();
+}
+
+function skipClass(){
+  _classIdx++;
+  if(_classIdx>=_classQueue.length){
+    _classModalInst?.hide();
+    toast(`Classificação encerrada. ${_classIdx} itens processados.`,'warning');
+    go('lanc');
+  } else {
+    fillClassModal();
+  }
+}
+
+// ============================================================
+// INITIALIZAÇÃO
+// ============================================================
+if(typeof pdfjsLib!=='undefined'){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+trySilentLogin();
+
+// Auto-refresh lancamentos table when visible
+setInterval(()=>{
+  if(_view==='lanc') renderLancTable();
+},5000);
+</script>
+</body></html>
