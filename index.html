@@ -430,10 +430,21 @@ function empToRow(e){
   return {Id:e.id, Title:e.nome, Razao:e.razao||'', CNPJ:e.cnpj||'', Regime:e.regime||'',
     Plano:tpl?tpl.nome:'', DataEntrada:e.dataEntrada||'', Nova:e.isNova?'Sim':'Não', Obs:e.obs||''};
 }
+function parseExcelDate(v){
+  if(v===undefined||v===null||v==='') return '';
+  if(typeof v==='number'){
+    // Excel guarda datas como número serial (dias desde 1899-12-30)
+    const utcDays=Math.floor(v-25569);
+    const utcValue=utcDays*86400;
+    return new Date(utcValue*1000).toISOString().slice(0,10);
+  }
+  return String(v).slice(0,10);
+}
+
 function rowToEmp(r){
   const tpl=DB.templates.find(t=>t.nome===r.Plano);
   return {id:String(r.Id), nome:r.Title||'', razao:r.Razao||'', cnpj:r.CNPJ||'', regime:r.Regime||'',
-    planoId:tpl?tpl.id:null, dataEntrada:r.DataEntrada?String(r.DataEntrada).slice(0,10):'',
+    planoId:tpl?tpl.id:null, dataEntrada:parseExcelDate(r.DataEntrada),
     isNova:r.Nova==='Sim', obs:r.Obs||'', razaoImportada:false};
 }
 function tplToRow(t){ return {Id:t.id, Title:t.nome, Descricao:t.descricao||'', ContasJSON:JSON.stringify(t.contas||[])}; }
@@ -450,7 +461,7 @@ function rowToBanco(r){
   const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
   return {id:String(r.Id), empId:e?e.id:null, apelido:r.Title||'', banco:r.Banco||'', agencia:r.Agencia||'',
     conta:r.Conta||'', tipo:r.Tipo||'', contabil:r.ContaContabil||'', saldo:parseFloat(r.Saldo)||0,
-    dataSaldo:r.DataSaldo?String(r.DataSaldo).slice(0,10):''};
+    dataSaldo:parseExcelDate(r.DataSaldo)};
 }
 function lancToRow(l){
   const e=getEmp(l.empId); const b=l.bancoId?DB.bancos.find(x=>x.id===l.bancoId):null;
@@ -461,7 +472,7 @@ function lancToRow(l){
 function rowToLanc(r){
   const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
   const b=r.Banco?DB.bancos.find(x=>x.apelido===r.Banco && (!e||x.empId===e.id)):null;
-  return {id:String(r.Id), empId:e?e.id:null, bancoId:b?b.id:null, data:r.Data?String(r.Data).slice(0,10):'',
+  return {id:String(r.Id), empId:e?e.id:null, bancoId:b?b.id:null, data:parseExcelDate(r.Data),
     contaD:r.ContaD||'', contaC:r.ContaC||'', valor:parseFloat(r.Valor)||0, hist:r.Historico||'',
     codHist:r.CodHistorico||'', doc:r.Documento||'', origem:r.Origem||'', conciliado:r.Conciliado==='Sim'};
 }
