@@ -415,7 +415,7 @@ async function xlDeleteRowById(table, id){
   const rows = await xlGetRows(table);
   const row = rows.find(r=>String(r.Id)===String(id));
   if(!row) return;
-  await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows/itemAt(index=${row._rowIndex})/delete`, {});
+  await graph('DELETE', `/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows/itemAt(index=${row._rowIndex})`);
 }
 
 async function xlUploadFile(filename, arrayBuffer, contentType){
