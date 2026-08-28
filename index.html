@@ -1031,7 +1031,8 @@ function renderEmpresas(){
           <td><span class="${e.isNova?'tag-novo':'tag-exist'}">${e.isNova?'Cliente Novo':'Cliente Existente'}</span></td>
           <td><span class="badge bg-info text-dark">${bcs.length}</span></td>
           <td>
-            <button class="btn btn-sm btn-outline-primary me-1" onclick="go('emp-det',{id:'${e.id}'})"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="go('emp-det',{id:'${e.id}'})"><i class="bi bi-eye"></i></button>
+            <button class="btn btn-sm btn-outline-primary me-1" onclick="go('emp-form',{id:'${e.id}'})"><i class="bi bi-pencil"></i></button>
             <button class="btn btn-sm btn-outline-danger" onclick="delEmp('${e.id}')"><i class="bi bi-trash"></i></button>
           </td>
         </tr>`;
@@ -1106,6 +1107,28 @@ function renderEmpForm(state){
       </div>
     </div>
   </div>
+  ${id?`
+  <div class="dt mb-3">
+    <div class="dth"><h5>🏦 Contas Bancárias</h5>
+      <button class="btn btn-primary btn-sm" onclick="openBancoModal('${e.id}',null)"><i class="bi bi-plus-lg me-1"></i>Adicionar Banco</button>
+    </div>
+    ${getBancos(e.id).length===0?`<div class="empty-state py-3"><p>Nenhum banco cadastrado</p></div>`:`
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Banco</th><th>Agência</th><th>Conta</th><th>Tipo</th><th>Conta Contábil</th><th>Saldo Inicial</th><th>Ações</th></tr></thead>
+      <tbody>${getBancos(e.id).map(b=>`<tr>
+        <td><strong>${b.apelido}</strong><br><small class="text-muted">${b.banco}</small></td>
+        <td><small>${b.agencia||'-'}</small></td>
+        <td><small>${b.conta||'-'}</small></td>
+        <td><span class="badge bg-light text-dark">${b.tipo||'CC'}</span></td>
+        <td><small>${b.contabil||'-'}</small></td>
+        <td><small>${R$(b.saldo||0)}</small></td>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary me-1" onclick="openBancoModal('${e.id}','${b.id}')"><i class="bi bi-pencil"></i></button>
+          <button class="btn btn-sm btn-outline-danger" onclick="delBanco('${b.id}','${e.id}')"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`).join('')}</tbody>
+    </table>`}
+  </div>`:''}
   <div class="d-flex gap-2">
     <button class="btn btn-primary" onclick="saveEmp('${e.id}','${id?'edit':'new'}')">
       <i class="bi bi-check-lg me-1"></i>Salvar Empresa
@@ -1114,7 +1137,7 @@ function renderEmpForm(state){
   </div>`;
 }
 
-// VIEW: DETALHE EMPRESA
+// VIEW: DETALHE EMPRESA (somente leitura)
 function renderEmpDet(state){
   const id=state&&state.id;
   const e=getEmp(id);
@@ -1124,10 +1147,7 @@ function renderEmpDet(state){
   const lancs=DB.lancamentos.filter(l=>l.empId===id);
   return`
   <div class="ph"><div><h2>🏢 ${e.nome}</h2><p>${e.razao||''} ${e.cnpj?'· '+e.cnpj:''}</p></div>
-    <div class="d-flex gap-2">
-      <button class="btn btn-outline-secondary btn-sm" onclick="go('empresas')">← Voltar</button>
-      <button class="btn btn-outline-primary btn-sm" onclick="go('emp-form',{id:'${e.id}'})"><i class="bi bi-pencil me-1"></i>Editar</button>
-    </div>
+    <button class="btn btn-outline-secondary btn-sm" onclick="go('empresas')">← Voltar</button>
   </div>
   <div class="row g-3 mb-3">
     <div class="col-md-4"><div class="sc">
@@ -1142,12 +1162,10 @@ function renderEmpDet(state){
       </table>
     </div></div>
     <div class="col-md-8"><div class="dt">
-      <div class="dth"><h5>🏦 Contas Bancárias</h5>
-        <button class="btn btn-primary btn-sm" onclick="openBancoModal('${e.id}',null)"><i class="bi bi-plus-lg me-1"></i>Adicionar Banco</button>
-      </div>
+      <div class="dth"><h5>🏦 Contas Bancárias</h5></div>
       ${bcs.length===0?`<div class="empty-state py-3"><p>Nenhum banco cadastrado</p></div>`:`
       <table class="table table-sm mb-0">
-        <thead><tr><th>Banco</th><th>Agência</th><th>Conta</th><th>Tipo</th><th>Conta Contábil</th><th>Saldo Inicial</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Banco</th><th>Agência</th><th>Conta</th><th>Tipo</th><th>Conta Contábil</th><th>Saldo Inicial</th></tr></thead>
         <tbody>${bcs.map(b=>`<tr>
           <td><strong>${b.apelido}</strong><br><small class="text-muted">${b.banco}</small></td>
           <td><small>${b.agencia||'-'}</small></td>
@@ -1155,18 +1173,12 @@ function renderEmpDet(state){
           <td><span class="badge bg-light text-dark">${b.tipo||'CC'}</span></td>
           <td><small>${b.contabil||'-'}</small></td>
           <td><small>${R$(b.saldo||0)}</small></td>
-          <td>
-            <button class="btn btn-sm btn-outline-secondary me-1" onclick="openBancoModal('${e.id}','${b.id}')"><i class="bi bi-pencil"></i></button>
-            <button class="btn btn-sm btn-outline-danger" onclick="delBanco('${b.id}','${e.id}')"><i class="bi bi-trash"></i></button>
-          </td>
         </tr>`).join('')}</tbody>
       </table>`}
     </div></div>
   </div>
   <div class="dt">
-    <div class="dth"><h5>📄 Lançamentos Recentes</h5>
-      <button class="btn btn-sm btn-outline-primary" onclick="go('import')">Importar extratos</button>
-    </div>
+    <div class="dth"><h5>📄 Lançamentos Recentes</h5></div>
     ${lancs.length===0?`<div class="empty-state py-3"><p>Nenhum lançamento</p></div>`:`
     <table class="table table-sm mb-0">
       <thead><tr><th>Data</th><th>Banco</th><th>Débito</th><th>Crédito</th><th>Valor</th><th>Histórico</th><th>Conciliado</th></tr></thead>
