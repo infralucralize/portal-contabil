@@ -186,7 +186,7 @@ label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4p
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-primary btn-sm" onclick="saveConta()">Salvar</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveConta" onclick="saveConta()">Salvar</button>
       </div>
     </div>
   </div>
@@ -224,7 +224,7 @@ label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4p
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-primary btn-sm" onclick="saveBanco()">Salvar</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveBanco" onclick="saveBanco()">Salvar</button>
       </div>
     </div>
   </div>
@@ -285,7 +285,7 @@ label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4p
       </div>
       <div class="modal-footer">
         <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-primary btn-sm" onclick="saveLanc()"><i class="bi bi-check-lg me-1"></i>Salvar Lançamento</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveLanc" onclick="saveLanc()"><i class="bi bi-check-lg me-1"></i>Salvar Lançamento</button>
       </div>
     </div>
   </div>
@@ -317,6 +317,18 @@ const SP_CONFIG = {
 };
 const GRAPH_SCOPES = ["Sites.ReadWrite.All","User.Read"];
 let _msal=null, _token=null, _driveId=null, _wbItemId=null;
+
+// Trava visual reutilizável pra botões de salvar/confirmar: desabilita e
+// mostra um spinner enquanto uma operação assíncrona (Graph/Excel) roda,
+// e devolve o texto original depois — evita a sensação de "travou".
+function btnBusy(id, loadingHTML){
+  const b=document.getElementById(id);
+  if(!b) return {restore:()=>{}};
+  const orig=b.innerHTML;
+  b.disabled=true;
+  b.innerHTML=loadingHTML||'<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
+  return {restore:()=>{ b.disabled=false; b.innerHTML=orig; }};
+}
 
 function encPath(p){ return p.split('/').map(encodeURIComponent).join('/'); }
 
@@ -979,7 +991,7 @@ function renderPlanoEdit(state){
   <div class="ph"><div><h2>${id?'✏️ Editar':'➕ Novo'} Template</h2><p>Plano de contas</p></div>
     <div class="d-flex gap-2">
       <button class="btn btn-outline-secondary btn-sm" onclick="go('plano')">← Voltar</button>
-      <button class="btn btn-success btn-sm" onclick="saveTpl()"><i class="bi bi-check-lg me-1"></i>Salvar Template</button>
+      <button class="btn btn-success btn-sm" id="btnSaveTpl" onclick="saveTpl()"><i class="bi bi-check-lg me-1"></i>Salvar Template</button>
     </div>
   </div>
   <div class="sc mb-3">
@@ -1157,7 +1169,7 @@ function renderEmpForm(state){
     </table>`}
   </div>`:''}
   <div class="d-flex gap-2">
-    <button class="btn btn-primary" onclick="saveEmp('${e.id}','${id?'edit':'new'}')">
+    <button class="btn btn-primary" id="btnSaveEmp" onclick="saveEmp('${e.id}','${id?'edit':'new'}')">
       <i class="bi bi-check-lg me-1"></i>Salvar Empresa
     </button>
     <button class="btn btn-outline-secondary" onclick="go('empresas')">Cancelar</button>
@@ -1279,6 +1291,10 @@ function renderImport(){
               <i class="bi bi-check-lg me-1"></i>Confirmar e Lançar
             </button>
           </div>
+        </div>
+        <div id="importProgressWrap" class="px-2 pt-2 d-none">
+          <div class="progress" style="height:6px"><div id="importProgressBar" class="progress-bar" style="width:0%"></div></div>
+          <small id="importProgressTxt" class="text-muted"></small>
         </div>
         <div id="previewBody">
           <div class="empty-state"><div class="icon">📂</div><p>Carregue um arquivo para visualizar as transações</p></div>
@@ -1402,7 +1418,15 @@ async function confirmarImport(){
   const unclass=_importPreview.filter(t=>!t.contaD||!t.contaC);
   // Add classified ones to lancamentos
   const classified=_importPreview.filter(t=>t.contaD&&t.contaC);
-  let erros=0;
+  const btn=document.getElementById('btnConfirmar');
+  const wrap=document.getElementById('importProgressWrap');
+  const bar=document.getElementById('importProgressBar');
+  const txt=document.getElementById('importProgressTxt');
+  const btnOrig=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Lançando...';
+  wrap.classList.remove('d-none');
+  let erros=0, feitos=0;
   for(const t of classified){
     const novo={
       id:uid(),empId,bancoId,data:t.data,
@@ -1412,10 +1436,16 @@ async function confirmarImport(){
       origem:t.origem,conciliado:false
     };
     try{ await xlAddRow('Lancamentos', lancToRow(novo)); }
-    catch(err){ erros++; console.error(err); continue; }
+    catch(err){ erros++; console.error(err); feitos++; continue; }
     DB.lancamentos.push(novo);
     DB.movimentos.push({...t,empId,bancoId});
+    feitos++;
+    const pct=Math.round(feitos/classified.length*100);
+    bar.style.width=pct+'%';
+    txt.textContent=`Lançando ${feitos} de ${classified.length}...`;
   }
+  wrap.classList.add('d-none');
+  btn.disabled=false; btn.innerHTML=btnOrig;
   if(erros>0) toast(`${erros} lançamento(s) não puderam ser gravados no Excel — veja o console.`,'danger');
   if(unclass.length>0){
     _classQueue=unclass; _classIdx=0; _classEmpId=empId;
@@ -1561,10 +1591,11 @@ async function saveLanc(){
     doc:document.getElementById('mlDoc').value,
     origem:document.getElementById('mlOrigem').value
   };
+  const lock=btnBusy('btnSaveLanc');
   try{
     if(editId){
       const l=DB.lancamentos.find(x=>x.id===editId);
-      if(!l){toast('Lançamento não encontrado','danger');return;}
+      if(!l){lock.restore(); toast('Lançamento não encontrado','danger');return;}
       Object.assign(l,campos);
       await xlUpsertRowById('Lancamentos', editId, lancToRow(l));
     } else {
@@ -1572,7 +1603,8 @@ async function saveLanc(){
       await xlAddRow('Lancamentos', lancToRow(novo));
       DB.lancamentos.push(novo);
     }
-  } catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  } catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  lock.restore();
   bootstrap.Modal.getInstance(document.getElementById('mLanc'))?.hide();
   toast(editId?'Lançamento atualizado!':'Lançamento registrado!');
   if(_view==='lanc') renderLancTable();
@@ -1971,13 +2003,15 @@ async function saveTpl(){
   if(!nome){toast('Informe o nome do template','danger');return;}
   _tplEdit.nome=nome; _tplEdit.descricao=desc||'';
   _tplBusy=true;
+  const lock=btnBusy('btnSaveTpl');
   try{
     const idx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
     if(idx>=0) await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit));
     else await xlAddRow('PlanoContas', tplToRow(_tplEdit));
     upsertLocalTpl();
-  }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
+  lock.restore();
   toast('Template salvo!');
   go('plano');
 }
@@ -2035,14 +2069,16 @@ async function saveConta(){
   if(!c.codigo||!c.nome){toast('Código e nome são obrigatórios','danger');return;}
   syncTplFromDOM();
   _tplBusy=true;
+  const lock=btnBusy('btnSaveConta');
   const backup=_tplEdit.contas.slice();
   if(idx>=0) _tplEdit.contas[idx]=c;
   else _tplEdit.contas.push(c);
   // Sort by codigo
   _tplEdit.contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
   try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
-  catch(err){ _tplEdit.contas=backup; toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  catch(err){ _tplEdit.contas=backup; lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
+  lock.restore();
   upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   bootstrap.Modal.getInstance(document.getElementById('mConta'))?.hide();
@@ -2088,10 +2124,12 @@ async function saveEmp(id,mode){
     obs:document.getElementById('eObs').value.trim(),
     razaoImportada:false
   };
+  const lock=btnBusy('btnSaveEmp');
   try{
     if(mode==='edit') await xlUpsertRowById('Empresas', id, empToRow(data));
     else await xlAddRow('Empresas', empToRow(data));
-  }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  lock.restore();
   if(mode==='edit'){
     const e=getEmp(id);
     if(e) Object.assign(e,data);
@@ -2165,10 +2203,12 @@ async function saveBanco(){
     saldo:parseFloat(document.getElementById('mbSaldo').value)||0,
     dataSaldo:document.getElementById('mbDataSaldo').value
   };
+  const lock=btnBusy('btnSaveBanco');
   try{
     if(existente) await xlUpsertRowById('Bancos', id, bancoToRow(data));
     else await xlAddRow('Bancos', bancoToRow(data));
-  }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  lock.restore();
   const idx=DB.bancos.findIndex(b=>b.id===id);
   if(idx>=0) DB.bancos[idx]=data; else DB.bancos.push(data);
   bootstrap.Modal.getInstance(document.getElementById('mBanco'))?.hide();
