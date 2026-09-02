@@ -426,7 +426,7 @@ const TABLE_HEADERS = {
 async function xlGetRows(table){
   await resolveWorkbook();
   const headers = TABLE_HEADERS[table];
-  let rows=[], url=`/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows?$top=200`;
+  let rows=[], url=`/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows?$top=4999`;
   let guard=0;
   while(url && guard<500){
     guard++;
@@ -434,12 +434,19 @@ async function xlGetRows(table){
     rows = rows.concat(resp.value||[]);
     url = resp['@odata.nextLink'] ? resp['@odata.nextLink'].replace('https://graph.microsoft.com/v1.0','') : null;
   }
+  warnIfNearRowLimit(table, rows.length);
   return rows.map((r,i)=>{
     const vals=r.values[0];
     const obj={_rowIndex:i};
     headers.forEach((h,ci)=>obj[h]=vals[ci]);
     return obj;
   });
+}
+
+// Aviso defensivo: se um dia a tabela passar de 4999 linhas, isso NÃO vai
+// pegar tudo (o limite acima precisa subir). Loga no console pra dar sinal.
+function warnIfNearRowLimit(table, count){
+  if(count>=4999) console.warn(`Tabela ${table} tem ${count}+ linhas — pode estar sendo cortada pelo limite de leitura. Avise o desenvolvedor.`);
 }
 
 async function xlAddRow(table, obj){
