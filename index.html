@@ -366,9 +366,12 @@ async function graph(method, path, body, extraHeaders){
   // (ex: exclusões em massa) sejam realmente gravadas no arquivo, não só
   // "prontas" numa sessão temporária que pode não persistir a tempo.
   if(_wbSessionId && path.includes('/workbook/')) headers['workbook-session-id']=_wbSessionId;
-  const opts = {method, headers};
+  const opts = {method, headers, cache:'no-store'};
   if(body!==undefined) opts.body = typeof body==='string' ? body : JSON.stringify(body);
-  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, opts);
+  // Cache-busting extra: evita qualquer resposta antiga guardada por proxy/navegador em GETs
+  let url=`https://graph.microsoft.com/v1.0${path}`;
+  if(method==='GET') url += (url.includes('?')?'&':'?') + '_cb=' + Date.now();
+  const res = await fetch(url, opts);
   if(!res.ok){ const t=await res.text(); throw new Error(`Graph ${method} ${path} -> ${res.status}: ${t}`); }
   if(res.status===204) return null;
   return res.json();
