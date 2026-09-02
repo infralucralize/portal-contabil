@@ -1924,18 +1924,35 @@ function gerarDominio(){
 // ============================================================
 // ACTIONS: PLANO DE CONTAS
 // ============================================================
+let _tplBusy=false;
+
+function syncTplFromDOM(){
+  const nomeEl=document.getElementById('tplNome');
+  const descEl=document.getElementById('tplDesc');
+  if(nomeEl) _tplEdit.nome=nomeEl.value.trim();
+  if(descEl) _tplEdit.descricao=descEl.value.trim();
+}
+
+function upsertLocalTpl(){
+  const idx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
+  if(idx>=0) DB.templates[idx]=_tplEdit;
+  else DB.templates.push(_tplEdit);
+}
+
 async function saveTpl(){
+  if(_tplBusy){ toast('Aguarde, salvando...','warning'); return; }
   const nome=document.getElementById('tplNome')?.value?.trim();
   const desc=document.getElementById('tplDesc')?.value?.trim();
   if(!nome){toast('Informe o nome do template','danger');return;}
   _tplEdit.nome=nome; _tplEdit.descricao=desc||'';
-  const idx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
+  _tplBusy=true;
   try{
+    const idx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
     if(idx>=0) await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit));
     else await xlAddRow('PlanoContas', tplToRow(_tplEdit));
+    upsertLocalTpl();
   }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
-  if(idx>=0) DB.templates[idx]=_tplEdit;
-  else DB.templates.push(_tplEdit);
+  finally{ _tplBusy=false; }
   toast('Template salvo!');
   go('plano');
 }
@@ -1978,6 +1995,7 @@ function openContaModal(idx){
 
 async function saveConta(){
   if(!_tplEdit)return;
+  if(_tplBusy){ toast('Aguarde, salvando...','warning'); return; }
   const idx=parseInt(document.getElementById('mcIdx').value);
   const c={
     codigo:document.getElementById('mcCod').value.trim(),
@@ -1990,6 +2008,8 @@ async function saveConta(){
     ch:parseInt(document.getElementById('mcCH').value)||0
   };
   if(!c.codigo||!c.nome){toast('Código e nome são obrigatórios','danger');return;}
+  syncTplFromDOM();
+  _tplBusy=true;
   const backup=_tplEdit.contas.slice();
   if(idx>=0) _tplEdit.contas[idx]=c;
   else _tplEdit.contas.push(c);
@@ -1997,8 +2017,8 @@ async function saveConta(){
   _tplEdit.contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
   try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
   catch(err){ _tplEdit.contas=backup; toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
-  const tplIdx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
-  if(tplIdx>=0) DB.templates[tplIdx]=_tplEdit;
+  finally{ _tplBusy=false; }
+  upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   bootstrap.Modal.getInstance(document.getElementById('mConta'))?.hide();
   toast('Conta salva!');
@@ -2006,12 +2026,15 @@ async function saveConta(){
 
 async function delConta(idx){
   if(!_tplEdit||!confirm('Excluir esta conta?'))return;
+  if(_tplBusy){ toast('Aguarde, salvando...','warning'); return; }
+  syncTplFromDOM();
+  _tplBusy=true;
   const backup=_tplEdit.contas.slice();
   _tplEdit.contas.splice(idx,1);
   try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
   catch(err){ _tplEdit.contas=backup; toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
-  const tplIdx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
-  if(tplIdx>=0) DB.templates[tplIdx]=_tplEdit;
+  finally{ _tplBusy=false; }
+  upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   toast('Conta excluída','warning');
 }
