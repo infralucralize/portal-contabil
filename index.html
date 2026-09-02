@@ -435,7 +435,7 @@ async function closeWbSession(){
 
 const TABLE_HEADERS = {
   Empresas:['Id','Title','Razao','CNPJ','Regime','Plano','DataEntrada','Nova','Obs'],
-  PlanoContas:['Id','Title','Descricao'],
+  PlanoContas:['Id','Title','Descricao','ContasJSON'],
   Contas:['Id','PlanoId','Codigo','Nome','Tipo','Natureza','Nivel','Aceita','Hp','Ch'],
   Bancos:['Id','Title','Empresa','Banco','Agencia','Conta','Tipo','ContaContabil','Saldo','DataSaldo'],
   Lancamentos:['Id','Empresa','Banco','Data','ContaD','ContaC','Valor','Historico','CodHistorico','Documento','Origem','Conciliado'],
@@ -535,7 +535,10 @@ function rowToEmp(r){
     planoId:tpl?tpl.id:null, dataEntrada:parseExcelDate(r.DataEntrada),
     isNova:r.Nova==='Sim', obs:r.Obs||'', razaoImportada:false};
 }
-function tplToRow(t){ return {Id:t.id, Title:t.nome, Descricao:t.descricao||''}; }
+// ContasJSON não é mais usado pra guardar dados (as contas ficam na aba
+// "Contas", uma por linha) — mas a coluna ainda existe na planilha, então
+// mandamos ela vazia só pra manter o número de colunas batendo com a tabela.
+function tplToRow(t){ return {Id:t.id, Title:t.nome, Descricao:t.descricao||'', ContasJSON:''}; }
 function rowToTpl(r){
   return {id:String(r.Id), nome:r.Title||'', descricao:r.Descricao||'', contas:[]};
 }
