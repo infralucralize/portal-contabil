@@ -358,8 +358,14 @@ async function graphLoginSilent(){
   return result;
 }
 
+let _wbSessionId = null;
+
 async function graph(method, path, body, extraHeaders){
   const headers = Object.assign({'Authorization':'Bearer '+_token,'Content-Type':'application/json'}, extraHeaders||{});
+  // Sessão persistente do Excel: garante que várias operações em sequência
+  // (ex: exclusões em massa) sejam realmente gravadas no arquivo, não só
+  // "prontas" numa sessão temporária que pode não persistir a tempo.
+  if(_wbSessionId && path.includes('/workbook/')) headers['workbook-session-id']=_wbSessionId;
   const opts = {method, headers};
   if(body!==undefined) opts.body = typeof body==='string' ? body : JSON.stringify(body);
   const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, opts);
@@ -379,6 +385,12 @@ async function resolveWorkbook(){
   _driveId = SP_CONFIG.driveId;
   const item = await graph('GET', `/drives/${_driveId}/root:/${encPath(SP_CONFIG.workbookPath)}`);
   _wbItemId = item.id;
+  try{
+    const session = await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/createSession`, {persistChanges:true});
+    _wbSessionId = session.id;
+  }catch(err){
+    console.error('Não foi possível abrir sessão persistente do Excel, seguindo sem ela:', err);
+  }
 }
 
 const TABLE_HEADERS = {
