@@ -148,8 +148,8 @@ label.form-label{font-size:.82rem;font-weight:600;color:#374151;margin-bottom:4p
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline-secondary btn-sm" onclick="skipClass()">Pular</button>
-        <button class="btn btn-primary btn-sm" onclick="saveClass()"><i class="bi bi-check-lg me-1"></i>Salvar e Próximo</button>
+        <button class="btn btn-outline-secondary btn-sm" id="btnSkipClass" onclick="skipClass()">Pular</button>
+        <button class="btn btn-primary btn-sm" id="btnSaveClass" onclick="saveClass()"><i class="bi bi-check-lg me-1"></i>Salvar e Próximo</button>
       </div>
     </div>
   </div>
@@ -1348,7 +1348,20 @@ function renderPreview(empId){
   count.textContent=`${_importPreview.length} transações`;
   if(_importPreview.length===0){body.innerHTML='<div class="empty-state py-3"><p>Nenhuma transação encontrada</p></div>';return;}
   document.getElementById('btnConfirmar').style.display='';
-  body.innerHTML=`<div class="table-responsive" style="max-height:400px;overflow-y:auto">
+  body.innerHTML=`
+  <div class="d-flex align-items-center gap-2 flex-wrap px-2 pt-2 pb-1" style="font-size:.8rem">
+    <span class="text-muted">Marcar todos:</span>
+    <span class="text-muted">Débito</span>
+    <select id="bulkContaD" class="form-select form-select-sm" style="width:auto;min-width:150px">
+      <option value="">Selecione...</option>${cOpts}
+    </select>
+    <span class="text-muted">Crédito</span>
+    <select id="bulkContaC" class="form-select form-select-sm" style="width:auto;min-width:150px">
+      <option value="">Selecione...</option>${cOpts}
+    </select>
+    <button class="btn btn-outline-primary btn-sm" onclick="aplicarContaTodos()">Aplicar a todos</button>
+  </div>
+  <div class="table-responsive" style="max-height:400px;overflow-y:auto">
     <table class="table table-sm mb-0">
       <thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Conta D</th><th>Conta C</th></tr></thead>
       <tbody>
@@ -1367,6 +1380,18 @@ function renderPreview(empId){
       </tbody>
     </table>
   </div>`;
+}
+
+function aplicarContaTodos(){
+  const cd=document.getElementById('bulkContaD')?.value;
+  const cc=document.getElementById('bulkContaC')?.value;
+  if(!cd&&!cc){toast('Selecione ao menos uma conta pra aplicar','warning');return;}
+  _importPreview.forEach(t=>{
+    if(cd) t.contaD=cd;
+    if(cc) t.contaC=cc;
+  });
+  renderPreview(_importEmpId);
+  toast('Contas aplicadas a todas as transações!');
 }
 
 async function confirmarImport(){
@@ -2228,6 +2253,10 @@ async function saveClass(){
   const doc=document.getElementById('mcDoc').value;
   const salvar=document.getElementById('mcSalvar').checked;
   if(!contaD||!contaC){toast('Selecione conta débito e crédito','danger');return;}
+  const btn=document.getElementById('btnSaveClass'), btnSkip=document.getElementById('btnSkipClass');
+  const btnOrig=btn.innerHTML;
+  btn.disabled=true; btnSkip.disabled=true;
+  btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Salvando...';
   try{
     // Create/atualiza lancamento
     const isLanc=txn._isLanc;
@@ -2257,8 +2286,10 @@ async function saveClass(){
     }
   }catch(err){
     toast('Erro ao salvar no Excel: '+err.message,'danger');
+    btn.disabled=false; btnSkip.disabled=false; btn.innerHTML=btnOrig;
     return;
   }
+  btn.disabled=false; btnSkip.disabled=false; btn.innerHTML=btnOrig;
   _classIdx++;
   fillClassModal();
 }
