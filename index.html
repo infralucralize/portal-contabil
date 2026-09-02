@@ -547,7 +547,7 @@ function contaToRow(planoId, c){
     Natureza:c.natureza||'D', Nivel:c.nivel||4, Aceita:c.aceita?'Sim':'Não', Hp:c.hp||'', Ch:c.ch||0};
 }
 function rowToConta(r){
-  return {id:String(r.Id), codigo:r.Codigo||'', nome:r.Nome||'', tipo:r.Tipo||'',
+  return {id:String(r.Id), codigo:String(r.Codigo||''), nome:r.Nome||'', tipo:r.Tipo||'',
     natureza:r.Natureza||'D', nivel:parseInt(r.Nivel)||4, aceita:r.Aceita==='Sim', hp:r.Hp||'', ch:parseInt(r.Ch)||0};
 }
 function bancoToRow(b){
