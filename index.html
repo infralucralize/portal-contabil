@@ -1398,13 +1398,15 @@ function renderImport(){
         <div id="impBancosArea" class="mb-3">
           <label class="form-label">Banco</label>
           <select id="impBanco" class="form-select"><option value="">Selecione a empresa primeiro</option></select>
+          <small class="text-muted d-none" id="impBancoAutoHint">Pra esse tipo de arquivo o banco é detectado por linha (coluna "Conta Corrente") — esse aqui é só o padrão pra quem não bater.</small>
         </div>
         <div class="mb-3">
           <label class="form-label">Tipo de Arquivo</label>
-          <select id="impTipo" class="form-select">
+          <select id="impTipo" class="form-select" onchange="onImpTipoChange()">
             <option value="ofx">OFX (extrato bancário)</option>
             <option value="excel">Excel / CSV</option>
             <option value="pdf">PDF (extrato bancário)</option>
+            <option value="financeiro">Financeiro (Movimentação — Omie/ERP)</option>
           </select>
         </div>
       </div>
@@ -1456,6 +1458,84 @@ function loadImpBancos(){
     bcs.map(b=>`<option value="${b.id}">${b.apelido} - ${b.banco}</option>`).join('');
 }
 
+function onImpTipoChange(){
+  const tipo=document.getElementById('impTipo').value;
+  const hint=document.getElementById('impBancoAutoHint');
+  hint.classList.toggle('d-none', tipo!=='financeiro');
+}
+
+// Tenta casar o texto de "Conta Corrente" do arquivo financeiro com um
+// banco já cadastrado da empresa (por apelido ou nome do banco).
+function matchBancoPorNome(nome, bancos){
+  if(!nome) return null;
+  const n=String(nome).toLowerCase().trim();
+  let b=bancos.find(x=>x.apelido&&x.apelido.toLowerCase().trim()===n);
+  if(b) return b;
+  b=bancos.find(x=>x.apelido&&(x.apelido.toLowerCase().includes(n)||n.includes(x.apelido.toLowerCase())));
+  if(b) return b;
+  b=bancos.find(x=>x.banco&&(x.banco.toLowerCase().includes(n)||n.includes(x.banco.toLowerCase())));
+  return b||null;
+}
+
+// -------------------- Parser "Financeiro" (movimentação de conta corrente — Omie/ERP) --------------------
+// Formato: uma linha por lançamento já conciliado, com Cliente/Fornecedor,
+// Conta Corrente (banco), Categoria, Valor (sinal positivo=crédito,
+// negativo=débito), CNPJ/CPF e Documento. Localiza colunas pelo texto do
+// cabeçalho (não por posição fixa), pra aguentar pequenas variações do export.
+function parseFinanceiroXlsx(buffer, empId){
+  const wb=XLSX.read(buffer,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+  const norm=s=>String(s).toLowerCase().trim();
+  let hdrIdx=-1, cols={};
+  const wanted={
+    data:['data'], cliente:['cliente ou fornecedor'], contaCorrente:['conta corrente'],
+    categoria:['categoria'], valor:['valor (r$)','valor'], documento:['documento'],
+    notaFiscal:['nota fiscal'], razaoSocial:['cliente ou fornecedor (razão social)','cliente ou fornecedor (razao social)'],
+    cnpj:['cliente ou fornecedor (cnpj/cpf)'], observacoes:['observações','observacoes']
+  };
+  for(let i=0;i<Math.min(rows.length,10);i++){
+    const r=rows[i].map(norm);
+    if(r.some(c=>c==='data')&&r.some(c=>c.includes('valor'))){
+      hdrIdx=i;
+      for(const key in wanted){
+        cols[key]=r.findIndex(c=>wanted[key].some(w=>c===w||c.includes(w)));
+      }
+      break;
+    }
+  }
+  if(hdrIdx<0) throw new Error('Não reconheci o formato desse arquivo (esperava colunas "Data", "Valor (R$)" etc.)');
+  const bancos=getBancos(empId);
+  const txns=[];
+  for(let i=hdrIdx+1;i<rows.length;i++){
+    const r=rows[i];
+    if(!r||r.every(c=>c==='')) continue;
+    const dv=r[cols.data];
+    let dataStr=null;
+    if(dv instanceof Date) dataStr=dv.toISOString().slice(0,10);
+    else if(typeof dv==='number'){ const d=XLSX.SSF.parse_date_code(dv); if(d) dataStr=`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }
+    else if(dv) dataStr=parseDate(String(dv));
+    if(!dataStr) continue;
+    const valorRaw=parseFloat(String(r[cols.valor]||'0').toString().replace(/[^\d,.-]/g,'').replace(',','.'));
+    if(isNaN(valorRaw)||valorRaw===0) continue;
+    const razaoSocial=cols.razaoSocial>=0?String(r[cols.razaoSocial]||'').trim():'';
+    const clienteFornecedor=cols.cliente>=0?String(r[cols.cliente]||'').trim():'';
+    const categoria=cols.categoria>=0?String(r[cols.categoria]||'').trim():'';
+    const cnpj=cols.cnpj>=0?String(r[cols.cnpj]||'').trim():'';
+    const contaCorrenteTxt=cols.contaCorrente>=0?String(r[cols.contaCorrente]||'').trim():'';
+    const banco=matchBancoPorNome(contaCorrenteTxt, bancos);
+    const descricao=(razaoSocial||clienteFornecedor||categoria||'Movimentação').trim();
+    txns.push({
+      id:uid(), data:dataStr, valor:Math.abs(valorRaw), tipo:valorRaw>0?'C':'D',
+      descricao, origem:'Financeiro', conciliado:false,
+      bancoId: banco?banco.id:null,
+      contaCorrenteTxt, categoria, cnpj,
+      doc: cols.documento>=0?String(r[cols.documento]||'').trim():(cols.notaFiscal>=0?String(r[cols.notaFiscal]||'').trim():'')
+    });
+  }
+  return{transactions:txns};
+}
+
 async function handleFile(file){
   if(!file)return;
   const empId=document.getElementById('impEmp').value;
@@ -1471,6 +1551,8 @@ async function handleFile(file){
       result=parseOFX(txt);
     } else if(tipo==='excel'){
       result=parseExcel(new Uint8Array(buf));
+    } else if(tipo==='financeiro'){
+      result=parseFinanceiroXlsx(new Uint8Array(buf), empId);
     } else {
       result=await parsePDF(new Uint8Array(buf));
     }
@@ -1522,6 +1604,10 @@ function contaFieldHtml(datalistId, inputId, value, contas, onchangeJs){
 
 function renderPreview(empId){
   const contas=getContasAnaliticas(empId);
+  const bancos=getBancos(empId);
+  const temCategoriaCnpj=_importPreview.some(t=>t.categoria||t.cnpj);
+  // banco padrão pra quem não tiver sido detectado por linha
+  _importPreview.forEach(t=>{ if(t.bancoId===undefined||t.bancoId===null) t.bancoId=_importBancoId||null; });
   // auto-classify
   _importPreview.forEach(t=>{if(!t.contaD)autoClassify(t,empId);});
   const body=document.getElementById('previewBody');
@@ -1529,6 +1615,7 @@ function renderPreview(empId){
   count.textContent=`${_importPreview.length} transações`;
   if(_importPreview.length===0){body.innerHTML='<div class="empty-state py-3"><p>Nenhuma transação encontrada</p></div>';return;}
   document.getElementById('btnConfirmar').style.display='';
+  const bancoOpts='<option value="">Sem banco</option>'+bancos.map(b=>`<option value="${b.id}">${b.apelido}</option>`).join('');
   body.innerHTML=`
   ${buildContaDatalist('dlContasImport', contas)}
   <div class="d-flex align-items-center gap-2 flex-wrap px-2 pt-2 pb-1" style="font-size:.8rem">
@@ -1541,13 +1628,17 @@ function renderPreview(empId){
   </div>
   <div class="table-responsive" style="max-height:400px;overflow-y:auto">
     <table class="table table-sm mb-0">
-      <thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Descrição</th><th>Conta D</th><th>Conta C</th></tr></thead>
+      <thead><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Banco</th><th>Descrição</th>${temCategoriaCnpj?'<th>Categoria</th>':''}<th>Conta D</th><th>Conta C</th></tr></thead>
       <tbody>
         ${_importPreview.map((t,i)=>`<tr class="${t.contaD&&t.contaC?'':'table-warning'}">
           <td><small>${fmtDate(t.data)}</small></td>
           <td><span class="${t.tipo==='C'?'vc':'vd'}">${t.tipo==='C'?'Entrada':'Saída'}</span></td>
           <td>${R$(t.valor)}</td>
-          <td><small title="${t.descricao}">${t.descricao.slice(0,30)}${t.descricao.length>30?'...':''}</small></td>
+          <td><select class="form-select form-select-sm" style="min-width:110px" onchange="_importPreview[${i}].bancoId=this.value||null">
+            ${bancoOpts.replace(`value="${t.bancoId||''}"`,`value="${t.bancoId||''}" selected`)}
+          </select></td>
+          <td><small title="${t.descricao}${t.cnpj?' · '+t.cnpj:''}">${t.descricao.slice(0,30)}${t.descricao.length>30?'...':''}</small></td>
+          ${temCategoriaCnpj?`<td><small class="text-muted" title="${t.categoria||''}">${(t.categoria||'-').slice(0,20)}</small></td>`:''}
           <td>${contaFieldHtml('dlContasImport',`pvD${i}`,t.contaD,contas,`onPreviewContaInput(${i},'contaD',this)`)}</td>
           <td>${contaFieldHtml('dlContasImport',`pvC${i}`,t.contaC,contas,`onPreviewContaInput(${i},'contaC',this)`)}</td>
         </tr>`).join('')}
@@ -1620,7 +1711,7 @@ async function confirmarImport(){
   for(const t of classified){
     if(_importAborted) break;
     const novo={
-      id:uid(),empId,bancoId,data:t.data,
+      id:uid(),empId,bancoId:t.bancoId||bancoId||null,data:t.data,
       contaD:t.contaD,contaC:t.contaC,
       valor:t.valor,hist:t.hist||t.descricao,
       codHist:t.codHist||'',doc:t.doc||'',
@@ -2928,7 +3019,7 @@ async function saveClass(){
       }
     } else {
       const novo={
-        id:uid(),empId:_classEmpId,bancoId:_importBancoId||txn.bancoId||null,
+        id:uid(),empId:_classEmpId,bancoId:txn.bancoId||_importBancoId||null,
         data:txn.data,contaD,contaC,valor:txn.valor,hist,codHist,doc,
         origem:txn.origem||'Import',conciliado:true
       };
