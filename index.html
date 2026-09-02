@@ -417,7 +417,8 @@ async function closeWbSession(){
 
 const TABLE_HEADERS = {
   Empresas:['Id','Title','Razao','CNPJ','Regime','Plano','DataEntrada','Nova','Obs'],
-  PlanoContas:['Id','Title','Descricao','ContasJSON'],
+  PlanoContas:['Id','Title','Descricao'],
+  Contas:['Id','PlanoId','Codigo','Nome','Tipo','Natureza','Nivel','Aceita','Hp','Ch'],
   Bancos:['Id','Title','Empresa','Banco','Agencia','Conta','Tipo','ContaContabil','Saldo','DataSaldo'],
   Lancamentos:['Id','Empresa','Banco','Data','ContaD','ContaC','Valor','Historico','CodHistorico','Documento','Origem','Conciliado'],
   Regras:['Id','Empresa','Pattern','ContaD','ContaC','Historico','CodHistorico']
@@ -516,10 +517,17 @@ function rowToEmp(r){
     planoId:tpl?tpl.id:null, dataEntrada:parseExcelDate(r.DataEntrada),
     isNova:r.Nova==='Sim', obs:r.Obs||'', razaoImportada:false};
 }
-function tplToRow(t){ return {Id:t.id, Title:t.nome, Descricao:t.descricao||'', ContasJSON:JSON.stringify(t.contas||[])}; }
+function tplToRow(t){ return {Id:t.id, Title:t.nome, Descricao:t.descricao||''}; }
 function rowToTpl(r){
-  let contas=[]; try{ contas=JSON.parse(r.ContasJSON||'[]'); }catch(e){ contas=[]; }
-  return {id:String(r.Id), nome:r.Title||'', descricao:r.Descricao||'', contas};
+  return {id:String(r.Id), nome:r.Title||'', descricao:r.Descricao||'', contas:[]};
+}
+function contaToRow(planoId, c){
+  return {Id:c.id, PlanoId:planoId, Codigo:c.codigo||'', Nome:c.nome||'', Tipo:c.tipo||'',
+    Natureza:c.natureza||'D', Nivel:c.nivel||4, Aceita:c.aceita?'Sim':'Não', Hp:c.hp||'', Ch:c.ch||0};
+}
+function rowToConta(r){
+  return {id:String(r.Id), codigo:r.Codigo||'', nome:r.Nome||'', tipo:r.Tipo||'',
+    natureza:r.Natureza||'D', nivel:parseInt(r.Nivel)||4, aceita:r.Aceita==='Sim', hp:r.Hp||'', ch:parseInt(r.Ch)||0};
 }
 function bancoToRow(b){
   const e=getEmp(b.empId);
@@ -560,24 +568,31 @@ function rowToRegra(r){
 async function loadAllData(){
   const [plRows] = await Promise.all([xlGetRows('PlanoContas')]);
   if(plRows.length===0){
-    // Planilha vazia: semeia os 3 templates padrão
+    // Planilha vazia: semeia os 3 templates padrão (com suas contas)
     const defaults=[
       {id:uid(),nome:'Simples Nacional - Padrão',descricao:'Plano padrão para empresas no Simples Nacional',contas:getContasPadrao()},
       {id:uid(),nome:'Lucro Presumido - Padrão',descricao:'Plano padrão para empresas no Lucro Presumido',contas:getContasPadrao()},
       {id:uid(),nome:'Lucro Real - Padrão',descricao:'Plano padrão para empresas no Lucro Real',contas:getContasPadrao()}
     ];
-    for(const t of defaults){ await xlAddRow('PlanoContas', tplToRow(t)); }
+    for(const t of defaults){
+      await xlAddRow('PlanoContas', tplToRow(t));
+      for(const c of t.contas){ await xlAddRow('Contas', contaToRow(t.id, c)); }
+    }
+    await closeWbSession();
     DB.templates = defaults;
   } else {
     DB.templates = plRows.filter(r=>r.Id).map(rowToTpl);
   }
-  const [empRows, bancoRows, lancRows, regraRows] = await Promise.all([
-    xlGetRows('Empresas'), xlGetRows('Bancos'), xlGetRows('Lancamentos'), xlGetRows('Regras')
+  const [empRows, bancoRows, lancRows, regraRows, contaRows] = await Promise.all([
+    xlGetRows('Empresas'), xlGetRows('Bancos'), xlGetRows('Lancamentos'), xlGetRows('Regras'), xlGetRows('Contas')
   ]);
   DB.empresas = empRows.filter(r=>r.Id).map(rowToEmp);
   DB.bancos = bancoRows.filter(r=>r.Id).map(rowToBanco);
   DB.lancamentos = lancRows.filter(r=>r.Id).map(rowToLanc);
   DB.regras = regraRows.filter(r=>r.Id).map(rowToRegra);
+  const contaRowsF = contaRows.filter(r=>r.Id);
+  const contasPorPlano = contaRowsF.reduce((acc,r)=>{ const pid=String(r.PlanoId||''); (acc[pid]=acc[pid]||[]).push(rowToConta(r)); return acc; },{});
+  DB.templates.forEach(t=>{ t.contas=(contasPorPlano[t.id]||[]).sort((a,b)=>a.codigo.localeCompare(b.codigo)); });
   DB.movimentos = [];
 }
 
@@ -753,7 +768,7 @@ function getContasPadrao(){
     {codigo:'6.1.1.010',nome:'Despesas com Depreciação',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Depreciação do período',ch:119},
     {codigo:'6.2.1.001',nome:'Despesas Financeiras',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'Juros e encargos financeiros',ch:120},
     {codigo:'6.2.1.002',nome:'Despesas com IOF',tipo:'Despesa',natureza:'D',nivel:4,aceita:true,hp:'IOF sobre operações financeiras',ch:121},
-  ];
+  ].map(c=>({...c,id:uid()}));
 }
 
 // initData() foi substituída por loadAllData() (ver módulo Graph/Excel acima),
@@ -1049,7 +1064,15 @@ function renderPlanoEdit(state){
         <button class="btn btn-outline-secondary btn-sm me-2" onclick="importContasPadrao()">
           <i class="bi bi-download me-1"></i>Importar Contas Padrão
         </button>
-        <small class="text-muted">Importa o plano de contas padrão Lucralize</small>
+        <button class="btn btn-outline-primary btn-sm me-2" onclick="document.getElementById('domFileInp').click()">
+          <i class="bi bi-file-earmark-excel me-1"></i>Importar do Domínio
+        </button>
+        <input type="file" id="domFileInp" class="d-none" accept=".xlsx,.xls" onchange="handleDominioFile(this.files[0])">
+        <small class="text-muted">Importar Contas Padrão: modelo genérico de exemplo. Importar do Domínio: sobe o plano de contas exportado do Domínio (Excel).</small>
+        <div id="domImportProgressWrap" class="mt-2 d-none">
+          <div class="progress" style="height:6px"><div id="domImportProgressBar" class="progress-bar" style="width:0%"></div></div>
+          <small id="domImportProgressTxt" class="text-muted"></small>
+        </div>
       </div>
     </div>
   </div>
@@ -2235,20 +2258,116 @@ async function saveTpl(){
 
 async function delTpl(id){
   if(DB.empresas.some(e=>e.planoId===id)){toast('Não é possível excluir: template vinculado a empresas','danger');return;}
-  if(!confirm('Excluir este template?'))return;
-  try{ await xlDeleteRowById('PlanoContas', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  if(!confirm('Excluir este template e todas as suas contas?'))return;
+  const tpl=DB.templates.find(t=>t.id===id);
+  try{
+    for(const c of (tpl?tpl.contas:[])) await xlDeleteRowById('Contas', c.id);
+    await xlDeleteRowById('PlanoContas', id);
+  }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
   await closeWbSession();
   DB.templates=DB.templates.filter(t=>t.id!==id);
   toast('Template excluído','warning');
   go('plano');
 }
 
-function importContasPadrao(){
+// Importa o plano de contas padrão de exemplo (poucas contas, só pra teste/demonstração)
+async function importContasPadrao(){
   if(!_tplEdit)return;
   if(_tplEdit.contas.length>0&&!confirm('Isso substituirá as contas atuais. Continuar?'))return;
-  _tplEdit.contas=getContasPadrao();
+  const antigas=_tplEdit.contas.slice();
+  const novas=getContasPadrao();
+  const lock=btnBusy('btnSaveTpl');
+  try{
+    for(const c of antigas) await xlDeleteRowById('Contas', c.id);
+    for(const c of novas) await xlAddRow('Contas', contaToRow(_tplEdit.id, c));
+  }catch(err){ lock.restore(); toast('Erro ao importar contas: '+err.message,'danger'); return; }
+  await closeWbSession();
+  lock.restore();
+  _tplEdit.contas=novas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
+  upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   toast('Contas padrão importadas!');
+}
+
+// -------------------- Importar plano de contas do Domínio --------------------
+// Lê o arquivo Excel exportado do Domínio (relatório "Plano de Contas"),
+// reconhecendo o layout: uma célula com o código hierárquico (ex: 1.1.1.01.0001),
+// o marcador "S" pra contas sintéticas (não aceitam lançamento), o nome
+// indentado conforme o nível, e o grau na última coluna preenchida da linha.
+function parseContasDominio(rows){
+  const contas=[];
+  for(const r of rows){
+    if(!r||r.length===0) continue;
+    const codIdx=r.findIndex(c=>typeof c==='string' && /^\d{1,2}(\.\d{1,4}){0,4}$/.test(c.trim()));
+    if(codIdx<0) continue;
+    const codigo=r[codIdx].trim();
+    const isSint=r.slice(0,codIdx).some(c=>String(c).trim().toUpperCase()==='S');
+    let grau=null;
+    for(let i=r.length-1;i>codIdx;i--){
+      const v=r[i];
+      if(v!==''&&v!==null&&v!==undefined&&!isNaN(Number(v))){ grau=Number(v); break; }
+    }
+    if(grau===null) continue;
+    let nome='';
+    for(let i=codIdx+1;i<r.length;i++){
+      const v=r[i];
+      if(v===''||v===null||v===undefined) continue;
+      if(!isNaN(Number(v))) continue;
+      nome=String(v).trim();
+      break;
+    }
+    if(!nome) continue;
+    let tipo='Despesa', natureza='D';
+    if(codigo.startsWith('1')){ tipo='Ativo'; natureza='D'; }
+    else if(codigo.startsWith('2.3')){ tipo='PL'; natureza='C'; }
+    else if(codigo.startsWith('2')){ tipo='Passivo'; natureza='C'; }
+    else if(codigo.startsWith('3.1')){ tipo='Custos'; natureza='D'; }
+    else if(codigo.startsWith('3')){ tipo='Despesa'; natureza='D'; }
+    else if(codigo.startsWith('4')){ tipo='Receita'; natureza='C'; }
+    else if(codigo.startsWith('5')){ tipo='Despesa'; natureza='D'; } // contas de apuração
+    contas.push({id:uid(), codigo, nome, tipo, natureza, nivel:grau, aceita:!isSint, hp:'', ch:0});
+  }
+  return contas;
+}
+
+async function handleDominioFile(file){
+  if(!file||!_tplEdit) return;
+  if(_tplEdit.contas.length>0 && !confirm('Isso substituirá TODAS as contas atuais desse template pelo conteúdo do arquivo do Domínio. Continuar?')) return;
+  let contas;
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+    contas=parseContasDominio(rows);
+  }catch(err){ toast('Erro ao ler o arquivo: '+err.message,'danger'); return; }
+  if(contas.length===0){ toast('Não encontrei nenhuma conta reconhecível nesse arquivo.','danger'); return; }
+  const antigas=_tplEdit.contas.slice();
+  const wrap=document.getElementById('domImportProgressWrap');
+  const bar=document.getElementById('domImportProgressBar');
+  const txt=document.getElementById('domImportProgressTxt');
+  wrap.classList.remove('d-none');
+  const total=antigas.length+contas.length;
+  let feito=0, erros=0;
+  try{
+    for(const c of antigas){
+      try{ await xlDeleteRowById('Contas', c.id); }catch(err){ erros++; console.error(err); }
+      feito++; bar.style.width=Math.round(feito/total*100)+'%'; txt.textContent=`Removendo contas antigas... ${feito}/${total}`;
+    }
+    for(const c of contas){
+      try{ await xlAddRow('Contas', contaToRow(_tplEdit.id, c)); }catch(err){ erros++; console.error(err); }
+      feito++; bar.style.width=Math.round(feito/total*100)+'%'; txt.textContent=`Gravando contas do Domínio... ${feito}/${total}`;
+    }
+  } finally {
+    wrap.classList.add('d-none');
+  }
+  await closeWbSession();
+  _tplEdit.contas=contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
+  upsertLocalTpl();
+  document.getElementById('contasBody').innerHTML=renderContasRows();
+  document.getElementById('domFileInp').value='';
+  if(erros>0) toast(`Importado com ${erros} erro(s) — veja o console.`,'danger');
+  else toast(`${contas.length} contas importadas do Domínio!`);
 }
 
 function openContaModal(idx){
@@ -2282,22 +2401,23 @@ async function saveConta(){
     nivel:parseInt(document.getElementById('mcNiv').value),
     aceita:parseInt(document.getElementById('mcNiv').value)===4,
     hp:document.getElementById('mcHP').value.trim(),
-    ch:parseInt(document.getElementById('mcCH').value)||0
+    ch:parseInt(document.getElementById('mcCH').value)||0,
+    id: idx>=0 ? _tplEdit.contas[idx].id : uid()
   };
   if(!c.codigo||!c.nome){toast('Código e nome são obrigatórios','danger');return;}
-  syncTplFromDOM();
   _tplBusy=true;
   const lock=btnBusy('btnSaveConta');
   const backup=_tplEdit.contas.slice();
-  if(idx>=0) _tplEdit.contas[idx]=c;
-  else _tplEdit.contas.push(c);
-  // Sort by codigo
-  _tplEdit.contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
-  try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
-  catch(err){ _tplEdit.contas=backup; lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  try{
+    if(idx>=0) await xlUpsertRowById('Contas', c.id, contaToRow(_tplEdit.id, c));
+    else await xlAddRow('Contas', contaToRow(_tplEdit.id, c));
+  }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
   await closeWbSession();
   lock.restore();
+  if(idx>=0) _tplEdit.contas[idx]=c;
+  else _tplEdit.contas.push(c);
+  _tplEdit.contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
   upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   bootstrap.Modal.getInstance(document.getElementById('mConta'))?.hide();
@@ -2307,14 +2427,13 @@ async function saveConta(){
 async function delConta(idx){
   if(!_tplEdit||!confirm('Excluir esta conta?'))return;
   if(_tplBusy){ toast('Aguarde, salvando...','warning'); return; }
-  syncTplFromDOM();
+  const c=_tplEdit.contas[idx];
   _tplBusy=true;
-  const backup=_tplEdit.contas.slice();
-  _tplEdit.contas.splice(idx,1);
-  try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
-  catch(err){ _tplEdit.contas=backup; toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  try{ await xlDeleteRowById('Contas', c.id); }
+  catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
   await closeWbSession();
+  _tplEdit.contas.splice(idx,1);
   upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   toast('Conta excluída','warning');
