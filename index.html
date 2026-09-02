@@ -86,6 +86,9 @@ a,.login-link{color:var(--pr)}
 </head>
 <body>
 
+<!-- Datalist compartilhada pros campos de conta com busca (modais fora da tela de importação) -->
+<datalist id="dlContasGeral"></datalist>
+
 <!-- LOGIN GATE -->
 <div id="login-gate" style="position:fixed;inset:0;z-index:99999;background:linear-gradient(135deg,#0d1b2a,#1a2332);display:flex;align-items:center;justify-content:center;">
   <div style="text-align:center;max-width:340px;padding:32px;">
@@ -139,11 +142,11 @@ a,.login-link{color:var(--pr)}
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Conta Débito *</label>
-            <select id="mcDebito" class="form-select"></select>
+            <input type="text" list="dlContasGeral" id="mcDebito" class="form-control" placeholder="Código ou nome...">
           </div>
           <div class="col-md-6">
             <label class="form-label">Conta Crédito *</label>
-            <select id="mcCredito" class="form-select"></select>
+            <input type="text" list="dlContasGeral" id="mcCredito" class="form-control" placeholder="Código ou nome...">
           </div>
           <div class="col-md-3">
             <label class="form-label">Cód. Histórico</label>
@@ -241,7 +244,7 @@ a,.login-link{color:var(--pr)}
             <select id="mbTipo" class="form-select"><option value="CC">Corrente</option><option value="CP">Poupança</option><option value="CI">Investimento</option></select>
           </div>
           <div class="col-12"><label class="form-label">Conta Contábil (Plano de Contas)</label>
-            <select id="mbContabil" class="form-select"><option value="">Selecione...</option></select>
+            <input type="text" list="dlContasGeral" id="mbContabil" class="form-control" placeholder="Código ou nome...">
           </div>
           <div class="col-6"><label class="form-label">Saldo Inicial (R$)</label><input type="number" id="mbSaldo" class="form-control" placeholder="0,00" step="0.01"></div>
           <div class="col-6"><label class="form-label">Data Saldo Inicial</label><input type="date" id="mbDataSaldo" class="form-control"></div>
@@ -277,11 +280,11 @@ a,.login-link{color:var(--pr)}
           </div>
           <div class="col-md-6">
             <label class="form-label">Conta Débito *</label>
-            <select id="mlDebito" class="form-select"></select>
+            <input type="text" list="dlContasGeral" id="mlDebito" class="form-control" placeholder="Código ou nome...">
           </div>
           <div class="col-md-6">
             <label class="form-label">Conta Crédito *</label>
-            <select id="mlCredito" class="form-select"></select>
+            <input type="text" list="dlContasGeral" id="mlCredito" class="form-control" placeholder="Código ou nome...">
           </div>
           <div class="col-md-4">
             <label class="form-label">Valor (R$) *</label>
@@ -1494,9 +1497,31 @@ function handleDrop(e){
   if(file) handleFile(file);
 }
 
+// -------------------- campo de conta com busca (autocomplete) --------------------
+// Em vez de <select> (impraticável com centenas de contas), usa um <input> de
+// texto com <datalist>, que já dá busca nativa por código ou nome no navegador.
+function buildContaDatalist(id, contas){
+  return `<datalist id="${id}">${contas.map(c=>`<option value="${c.codigo} - ${c.nome}">`).join('')}</datalist>`;
+}
+function contaInputValue(codigo, contas){
+  const c=contas.find(x=>x.codigo===codigo);
+  return c?`${c.codigo} - ${c.nome}`:'';
+}
+function resolveContaCodigo(text, contas){
+  const t=(text||'').trim();
+  if(!t) return '';
+  const dash=t.indexOf(' - ');
+  const codigo=dash>=0?t.slice(0,dash).trim():t;
+  return contas.find(c=>c.codigo===codigo)?codigo:'';
+}
+function contaFieldHtml(datalistId, inputId, value, contas, onchangeJs){
+  return `<input type="text" list="${datalistId}" id="${inputId}" class="form-control form-control-sm"
+    style="min-width:180px" placeholder="Código ou nome..." value="${contaInputValue(value,contas)}"
+    onchange="${onchangeJs}">`;
+}
+
 function renderPreview(empId){
   const contas=getContasAnaliticas(empId);
-  const cOpts=contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
   // auto-classify
   _importPreview.forEach(t=>{if(!t.contaD)autoClassify(t,empId);});
   const body=document.getElementById('previewBody');
@@ -1505,16 +1530,13 @@ function renderPreview(empId){
   if(_importPreview.length===0){body.innerHTML='<div class="empty-state py-3"><p>Nenhuma transação encontrada</p></div>';return;}
   document.getElementById('btnConfirmar').style.display='';
   body.innerHTML=`
+  ${buildContaDatalist('dlContasImport', contas)}
   <div class="d-flex align-items-center gap-2 flex-wrap px-2 pt-2 pb-1" style="font-size:.8rem">
     <span class="text-muted">Marcar todos:</span>
     <span class="text-muted">Débito</span>
-    <select id="bulkContaD" class="form-select form-select-sm" style="width:auto;min-width:150px">
-      <option value="">Selecione...</option>${cOpts}
-    </select>
+    ${contaFieldHtml('dlContasImport','bulkContaD','',contas,'')}
     <span class="text-muted">Crédito</span>
-    <select id="bulkContaC" class="form-select form-select-sm" style="width:auto;min-width:150px">
-      <option value="">Selecione...</option>${cOpts}
-    </select>
+    ${contaFieldHtml('dlContasImport','bulkContaC','',contas,'')}
     <button class="btn btn-outline-primary btn-sm" onclick="aplicarContaTodos()">Aplicar a todos</button>
   </div>
   <div class="table-responsive" style="max-height:400px;overflow-y:auto">
@@ -1526,22 +1548,43 @@ function renderPreview(empId){
           <td><span class="${t.tipo==='C'?'vc':'vd'}">${t.tipo==='C'?'Entrada':'Saída'}</span></td>
           <td>${R$(t.valor)}</td>
           <td><small title="${t.descricao}">${t.descricao.slice(0,30)}${t.descricao.length>30?'...':''}</small></td>
-          <td><select class="form-select form-select-sm" style="min-width:140px" onchange="_importPreview[${i}].contaD=this.value">
-            <option value="">Selecione...</option>${cOpts.replace(`value="${t.contaD||''}"`,`value="${t.contaD||''}" selected`)}
-          </select></td>
-          <td><select class="form-select form-select-sm" style="min-width:140px" onchange="_importPreview[${i}].contaC=this.value">
-            <option value="">Selecione...</option>${cOpts.replace(`value="${t.contaC||''}"`,`value="${t.contaC||''}" selected`)}
-          </select></td>
+          <td>${contaFieldHtml('dlContasImport',`pvD${i}`,t.contaD,contas,`onPreviewContaInput(${i},'contaD',this)`)}</td>
+          <td>${contaFieldHtml('dlContasImport',`pvC${i}`,t.contaC,contas,`onPreviewContaInput(${i},'contaC',this)`)}</td>
         </tr>`).join('')}
       </tbody>
     </table>
   </div>`;
 }
 
+// Atualiza a datalist geral com as contas analíticas de uma empresa,
+// pros campos de busca de conta (mcDebito/mcCredito/mbContabil/mlDebito/mlCredito).
+function refreshDlContasGeral(empId){
+  const contas=getContasAnaliticas(empId);
+  document.getElementById('dlContasGeral').innerHTML=contas.map(c=>`<option value="${c.codigo} - ${c.nome}">`).join('');
+  return contas;
+}
+function onContaInputChange(inputEl, contas){
+  const codigo=resolveContaCodigo(inputEl.value, contas);
+  inputEl.classList.toggle('is-invalid', inputEl.value.trim()!==''&&!codigo);
+  if(codigo) inputEl.value=contaInputValue(codigo, contas);
+  return codigo;
+}
+function onPreviewContaInput(i, campo, inputEl){
+  const empId=_importEmpId;
+  const contas=getContasAnaliticas(empId);
+  const codigo=resolveContaCodigo(inputEl.value, contas);
+  _importPreview[i][campo]=codigo;
+  inputEl.classList.toggle('is-invalid', inputEl.value.trim()!==''&&!codigo);
+  if(codigo) inputEl.value=contaInputValue(codigo, contas);
+  const tr=inputEl.closest('tr');
+  if(tr){ const t=_importPreview[i]; tr.classList.toggle('table-warning', !(t.contaD&&t.contaC)); }
+}
+
 function aplicarContaTodos(){
-  const cd=document.getElementById('bulkContaD')?.value;
-  const cc=document.getElementById('bulkContaC')?.value;
-  if(!cd&&!cc){toast('Selecione ao menos uma conta pra aplicar','warning');return;}
+  const contas=getContasAnaliticas(_importEmpId);
+  const cd=resolveContaCodigo(document.getElementById('bulkContaD')?.value, contas);
+  const cc=resolveContaCodigo(document.getElementById('bulkContaC')?.value, contas);
+  if(!cd&&!cc){toast('Selecione ao menos uma conta válida pra aplicar','warning');return;}
   _importPreview.forEach(t=>{
     if(cd) t.contaD=cd;
     if(cc) t.contaC=cc;
@@ -1812,10 +1855,11 @@ function openLancModal(id){
   document.getElementById('mlId').value=id||'';
   document.getElementById('mlEmp').value=l?l.empId:'';
   loadLancContas();
+  const contas=getContasAnaliticas(l?l.empId:'');
   document.getElementById('mlBanco').value=l?(l.bancoId||''):'';
   document.getElementById('mlData').value=l?l.data:new Date().toISOString().slice(0,10);
-  document.getElementById('mlDebito').value=l?l.contaD:'';
-  document.getElementById('mlCredito').value=l?l.contaC:'';
+  document.getElementById('mlDebito').value=l?contaInputValue(l.contaD,contas):'';
+  document.getElementById('mlCredito').value=l?contaInputValue(l.contaC,contas):'';
   document.getElementById('mlValor').value=l?l.valor:'';
   document.getElementById('mlCodH').value=l?(l.codHist||''):'';
   document.getElementById('mlHist').value=l?(l.hist||''):'';
@@ -1828,24 +1872,21 @@ function openLancModal(id){
 function loadLancContas(){
   const empId=document.getElementById('mlEmp').value;
   const bancSel=document.getElementById('mlBanco');
-  const dbSel=document.getElementById('mlDebito');
-  const crSel=document.getElementById('mlCredito');
   const bcs=empId?getBancos(empId):[];
   bancSel.innerHTML='<option value="">Sem banco</option>'+bcs.map(b=>`<option value="${b.id}">${b.apelido}</option>`).join('');
-  const contas=empId?getContasAnaliticas(empId):[];
-  const opts='<option value="">Selecione...</option>'+contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
-  dbSel.innerHTML=opts; crSel.innerHTML=opts;
+  refreshDlContasGeral(empId);
 }
 
 async function saveLanc(){
   const editId=document.getElementById('mlId').value;
   const empId=document.getElementById('mlEmp').value;
   const data=document.getElementById('mlData').value;
-  const contaD=document.getElementById('mlDebito').value;
-  const contaC=document.getElementById('mlCredito').value;
+  const contas=getContasAnaliticas(empId);
+  const contaD=resolveContaCodigo(document.getElementById('mlDebito').value, contas);
+  const contaC=resolveContaCodigo(document.getElementById('mlCredito').value, contas);
   const valor=parseFloat(document.getElementById('mlValor').value);
   if(!empId||!data||!contaD||!contaC||isNaN(valor)||valor<=0){
-    toast('Preencha todos os campos obrigatórios','danger');return;
+    toast('Preencha todos os campos obrigatórios (confira se a conta débito/crédito foi escolhida da lista)','danger');return;
   }
   const campos={
     empId,bancoId:document.getElementById('mlBanco').value||null,
@@ -2535,10 +2576,9 @@ function openBancoModal(empId,bancoId){
   document.getElementById('mBancoTit').textContent=bancoId?'Editar Banco':'Adicionar Banco';
   document.getElementById('mbEmpId').value=empId;
   document.getElementById('mbId').value=bancoId||'';
-  // Populate conta contabil options
-  const contas=getContasAnaliticas(empId);
+  // Popula a datalist de contas analíticas dessa empresa
+  const contas=refreshDlContasGeral(empId);
   const sel=document.getElementById('mbContabil');
-  sel.innerHTML='<option value="">Selecione...</option>'+contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
   if(bancoId){
     const b=DB.bancos.find(b=>b.id===bancoId);
     if(b){
@@ -2547,12 +2587,13 @@ function openBancoModal(empId,bancoId){
       document.getElementById('mbAg').value=b.agencia||'';
       document.getElementById('mbCta').value=b.conta||'';
       document.getElementById('mbTipo').value=b.tipo||'CC';
-      sel.value=b.contabil||'';
+      sel.value=contaInputValue(b.contabil,contas);
       document.getElementById('mbSaldo').value=b.saldo||0;
       document.getElementById('mbDataSaldo').value=b.dataSaldo||'';
     }
   } else {
     ['mbBanco','mbApel','mbAg','mbCta'].forEach(id=>document.getElementById(id).value='');
+    sel.value='';
     document.getElementById('mbSaldo').value=0;
     document.getElementById('mbDataSaldo').value=new Date().toISOString().slice(0,10);
   }
@@ -2566,11 +2607,12 @@ async function saveBanco(){
   const banco=document.getElementById('mbBanco').value;
   const apelido=document.getElementById('mbApel').value.trim();
   if(!banco||!apelido){toast('Banco e apelido são obrigatórios','danger');return;}
+  const contas=getContasAnaliticas(empId);
   const data={id,empId,banco,apelido,
     agencia:document.getElementById('mbAg').value,
     conta:document.getElementById('mbCta').value,
     tipo:document.getElementById('mbTipo').value,
-    contabil:document.getElementById('mbContabil').value,
+    contabil:resolveContaCodigo(document.getElementById('mbContabil').value, contas),
     saldo:parseFloat(document.getElementById('mbSaldo').value)||0,
     dataSaldo:document.getElementById('mbDataSaldo').value
   };
@@ -2632,24 +2674,23 @@ async function fillClassModal(){
       <div class="col-6"><small class="text-muted">Origem</small><div>${txn.origem||'-'}</div></div>
       <div class="col-12"><small class="text-muted">Descrição</small><div class="fw-semibold">${txn.descricao||'-'}</div></div>
     </div>`;
-  // Populate account selects
-  const contas=getContasAnaliticas(empId);
-  const opts='<option value="">Selecione...</option>'+contas.map(c=>`<option value="${c.codigo}">${c.codigo} - ${c.nome}</option>`).join('');
-  document.getElementById('mcDebito').innerHTML=opts;
-  document.getElementById('mcCredito').innerHTML=opts;
+  // Popula a datalist de contas dessa empresa
+  const contas=refreshDlContasGeral(empId);
+  document.getElementById('mcDebito').value='';
+  document.getElementById('mcCredito').value='';
   // Auto-suggest based on type
   if(txn.tipo==='C'){
     // Entry: D=Bank, C=Revenue
     const bankConta=contas.find(c=>c.nome.toLowerCase().includes('banco'));
     const revConta=contas.find(c=>c.tipo==='Receita');
-    if(bankConta) document.getElementById('mcDebito').value=bankConta.codigo;
-    if(revConta) document.getElementById('mcCredito').value=revConta.codigo;
+    if(bankConta) document.getElementById('mcDebito').value=contaInputValue(bankConta.codigo,contas);
+    if(revConta) document.getElementById('mcCredito').value=contaInputValue(revConta.codigo,contas);
   } else {
     // Exit: D=Expense, C=Bank
     const bankConta=contas.find(c=>c.nome.toLowerCase().includes('banco'));
     const expConta=contas.find(c=>c.tipo==='Despesa');
-    if(expConta) document.getElementById('mcDebito').value=expConta.codigo;
-    if(bankConta) document.getElementById('mcCredito').value=bankConta.codigo;
+    if(expConta) document.getElementById('mcDebito').value=contaInputValue(expConta.codigo,contas);
+    if(bankConta) document.getElementById('mcCredito').value=contaInputValue(bankConta.codigo,contas);
   }
   // Autofill history from description
   document.getElementById('mcHist').value=txn.descricao?.slice(0,80)||'';
@@ -2660,13 +2701,14 @@ async function fillClassModal(){
 
 async function saveClass(){
   const txn=_classQueue[_classIdx];
-  const contaD=document.getElementById('mcDebito').value;
-  const contaC=document.getElementById('mcCredito').value;
+  const contas=getContasAnaliticas(_classEmpId);
+  const contaD=resolveContaCodigo(document.getElementById('mcDebito').value, contas);
+  const contaC=resolveContaCodigo(document.getElementById('mcCredito').value, contas);
   const hist=document.getElementById('mcHist').value;
   const codHist=document.getElementById('mcCodHist').value;
   const doc=document.getElementById('mcDoc').value;
   const salvar=document.getElementById('mcSalvar').checked;
-  if(!contaD||!contaC){toast('Selecione conta débito e crédito','danger');return;}
+  if(!contaD||!contaC){toast('Selecione conta débito e crédito (escolha uma opção da lista)','danger');return;}
   const btn=document.getElementById('btnSaveClass'), btnSkip=document.getElementById('btnSkipClass');
   const btnOrig=btn.innerHTML;
   btn.disabled=true; btnSkip.disabled=true;
