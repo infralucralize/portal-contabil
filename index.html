@@ -459,7 +459,7 @@ function parseExcelDate(v){
 
 function rowToEmp(r){
   const tpl=DB.templates.find(t=>t.nome===r.Plano);
-  return {id:String(r.Id), nome:r.Title||'', razao:r.Razao||'', cnpj:r.CNPJ||'', regime:r.Regime||'',
+  return {id:String(r.Id), nome:r.Title||'', razao:r.Razao||'', cnpj:String(r.CNPJ||''), regime:r.Regime||'',
     planoId:tpl?tpl.id:null, dataEntrada:parseExcelDate(r.DataEntrada),
     isNova:r.Nova==='Sim', obs:r.Obs||'', razaoImportada:false};
 }
@@ -474,7 +474,7 @@ function bancoToRow(b){
     Conta:b.conta||'', Tipo:b.tipo||'', ContaContabil:b.contabil||'', Saldo:b.saldo||0, DataSaldo:b.dataSaldo||''};
 }
 function rowToBanco(r){
-  const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
+  const e=DB.empresas.find(x=>x.cnpj===String(r.Empresa||''));
   return {id:String(r.Id), empId:e?e.id:null, apelido:r.Title||'', banco:r.Banco||'', agencia:r.Agencia||'',
     conta:r.Conta||'', tipo:r.Tipo||'', contabil:r.ContaContabil||'', saldo:parseFloat(r.Saldo)||0,
     dataSaldo:parseExcelDate(r.DataSaldo)};
@@ -486,8 +486,8 @@ function lancToRow(l){
     Conciliado:l.conciliado?'Sim':'Não'};
 }
 function rowToLanc(r){
-  const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
-  const b=r.Banco?DB.bancos.find(x=>x.apelido===r.Banco && (!e||x.empId===e.id)):null;
+  const e=DB.empresas.find(x=>x.cnpj===String(r.Empresa||''));
+  const b=r.Banco?DB.bancos.find(x=>x.apelido===String(r.Banco) && (!e||x.empId===e.id)):null;
   return {id:String(r.Id), empId:e?e.id:null, bancoId:b?b.id:null, data:parseExcelDate(r.Data),
     contaD:r.ContaD||'', contaC:r.ContaC||'', valor:parseFloat(r.Valor)||0, hist:r.Historico||'',
     codHist:r.CodHistorico||'', doc:r.Documento||'', origem:r.Origem||'', conciliado:r.Conciliado==='Sim'};
@@ -498,7 +498,7 @@ function regraToRow(reg){
     Historico:reg.hist||'', CodHistorico:reg.codHist||''};
 }
 function rowToRegra(r){
-  const e=DB.empresas.find(x=>x.cnpj===r.Empresa);
+  const e=DB.empresas.find(x=>x.cnpj===String(r.Empresa||''));
   return {id:String(r.Id), empId:e?e.id:null, pattern:r.Pattern||'', contaD:r.ContaD||'', contaC:r.ContaC||'',
     hist:r.Historico||'', codHist:r.CodHistorico||''};
 }
@@ -1320,7 +1320,7 @@ async function handleFile(file){
     _importBancoId=document.getElementById('impBanco').value||null;
     // Guarda o arquivo original na pasta "Extratos Importados", pro histórico/auditoria
     const emp=getEmp(empId);
-    const cnpjSlug=(emp?.cnpj||'sem-cnpj').replace(/[^0-9]/g,'')||'sem-cnpj';
+    const cnpjSlug=String(emp?.cnpj||'sem-cnpj').replace(/[^0-9]/g,'')||'sem-cnpj';
     const nomeArquivo=`${new Date().toISOString().slice(0,10)}_${cnpjSlug}_${file.name}`.replace(/[\\/:*?"<>|]/g,'-');
     xlUploadFile(nomeArquivo, buf, file.type||'application/octet-stream')
       .catch(err=>{ console.error('Falha ao salvar extrato original:', err); toast('Aviso: não foi possível guardar o arquivo original no OneDrive ('+err.message+')','warning'); });
