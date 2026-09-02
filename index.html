@@ -1553,9 +1553,77 @@ function renderLanc(){
       </div>
     </div>
   </div>
-  <div class="dt"><div class="dth"><h5>Registros</h5><span id="lancCount" class="badge bg-secondary">0</span></div>
+  <div class="dt"><div class="dth"><h5>Registros</h5>
+    <div class="d-flex align-items-center gap-2">
+      <span id="lancCount" class="badge bg-secondary">0</span>
+      <button class="btn btn-outline-danger btn-sm d-none" id="btnDelSelected" onclick="delLancSelecionados()">
+        <i class="bi bi-trash me-1"></i>Excluir selecionados (<span id="lancSelCount">0</span>)
+      </button>
+    </div>
+  </div>
+    <div id="importProgressWrap2" class="px-2 pt-2 d-none">
+      <div class="progress" style="height:6px"><div id="importProgressBar2" class="progress-bar bg-danger" style="width:0%"></div></div>
+      <small id="importProgressTxt2" class="text-muted"></small>
+    </div>
     <div id="lancTable"></div>
   </div>`;
+}
+
+let _lancSelected=new Set();
+
+function toggleLancSel(id,checked){
+  if(checked) _lancSelected.add(id); else _lancSelected.delete(id);
+  updateLancSelBar();
+}
+
+function toggleLancSelAll(checked){
+  document.querySelectorAll('.lancChk').forEach(cb=>{
+    cb.checked=checked;
+    if(checked) _lancSelected.add(cb.value); else _lancSelected.delete(cb.value);
+  });
+  updateLancSelBar();
+}
+
+function updateLancSelBar(){
+  const n=_lancSelected.size;
+  const btn=document.getElementById('btnDelSelected');
+  document.getElementById('lancSelCount').textContent=n;
+  btn.classList.toggle('d-none', n===0);
+  const all=document.getElementById('lancChkAll');
+  if(all){
+    const total=document.querySelectorAll('.lancChk').length;
+    all.checked = total>0 && n===total;
+  }
+}
+
+async function delLancSelecionados(){
+  const ids=Array.from(_lancSelected);
+  if(!ids.length)return;
+  if(!confirm(`Excluir ${ids.length} lançamento(s) selecionado(s)? Essa ação não pode ser desfeita.`))return;
+  const btn=document.getElementById('btnDelSelected');
+  const wrap=document.getElementById('importProgressWrap2');
+  const bar=document.getElementById('importProgressBar2');
+  const txt=document.getElementById('importProgressTxt2');
+  const btnOrig=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Excluindo...';
+  wrap.classList.remove('d-none');
+  let erros=0, feitos=0;
+  for(const id of ids){
+    try{ await xlDeleteRowById('Lancamentos', id); }
+    catch(err){ erros++; console.error(err); feitos++; continue; }
+    DB.lancamentos=DB.lancamentos.filter(l=>l.id!==id);
+    feitos++;
+    const pct=Math.round(feitos/ids.length*100);
+    bar.style.width=pct+'%';
+    txt.textContent=`Excluindo ${feitos} de ${ids.length}...`;
+  }
+  wrap.classList.add('d-none');
+  btn.disabled=false; btn.innerHTML=btnOrig;
+  _lancSelected.clear();
+  if(erros>0) toast(`${erros} lançamento(s) não puderam ser excluídos — veja o console.`,'danger');
+  else toast(`${feitos} lançamento(s) excluído(s)!`,'warning');
+  renderLancTable();
 }
 
 function renderLancTable(){
@@ -1574,13 +1642,16 @@ function renderLancTable(){
   if(cnt)cnt.textContent=data.length;
   const el=document.getElementById('lancTable');
   if(!el)return;
-  if(data.length===0){el.innerHTML='<div class="empty-state py-4"><p>Nenhum lançamento encontrado</p></div>';return;}
+  if(data.length===0){el.innerHTML='<div class="empty-state py-4"><p>Nenhum lançamento encontrado</p></div>';updateLancSelBar();return;}
   el.innerHTML=`<div class="table-responsive"><table class="table table-hover table-sm mb-0">
-    <thead><tr><th>Data</th><th>Empresa</th><th>Banco</th><th>Conta Débito</th><th>Conta Crédito</th><th>Valor</th><th>Histórico</th><th>Doc</th><th>Origem</th><th>Concil.</th><th></th></tr></thead>
+    <thead><tr>
+      <th style="width:28px"><input type="checkbox" id="lancChkAll" onchange="toggleLancSelAll(this.checked)"></th>
+      <th>Data</th><th>Empresa</th><th>Banco</th><th>Conta Débito</th><th>Conta Crédito</th><th>Valor</th><th>Histórico</th><th>Doc</th><th>Origem</th><th>Concil.</th><th></th></tr></thead>
     <tbody>${data.map(l=>{
       const e=getEmp(l.empId);
       const b=l.bancoId?DB.bancos.find(b=>b.id===l.bancoId):null;
       return`<tr>
+        <td><input type="checkbox" class="lancChk" value="${l.id}" ${_lancSelected.has(l.id)?'checked':''} onchange="toggleLancSel('${l.id}',this.checked)"></td>
         <td><small>${fmtDate(l.data)}</small></td>
         <td><small>${e?e.nome:'-'}</small></td>
         <td><small>${b?b.apelido:'-'}</small></td>
@@ -1598,6 +1669,7 @@ function renderLancTable(){
       </tr>`;
     }).join('')}</tbody>
   </table></div>`;
+  updateLancSelBar();
 }
 
 function limparFiltros(){
@@ -1611,6 +1683,8 @@ function initLancModal(){
   empSel.innerHTML='<option value="">Selecione...</option>'+DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('mlData').value=today;
+  _lancSelected.clear();
+  renderLancTable();
 }
 
 function openLancModal(id){
