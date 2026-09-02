@@ -2089,6 +2089,13 @@ function renderRazao(){
         </div>
         <input type="file" id="razFile" class="d-none" accept=".xlsx,.xls,.csv,.pdf" onchange="processRazao(this.files[0])">
         <div id="razStatus" class="mt-2"></div>
+        <div id="razProgressWrap" class="mt-2 d-none">
+          <div class="progress" style="height:6px"><div id="razProgressBar" class="progress-bar" style="width:0%"></div></div>
+          <small id="razProgressTxt" class="text-muted"></small>
+          <button class="btn btn-outline-secondary btn-sm mt-1 d-none" id="btnAbortRazao" onclick="abortRazao()">
+            <i class="bi bi-x-circle me-1"></i>Cancelar
+          </button>
+        </div>
       </div>
     </div>
     <div class="col-md-7">
@@ -2120,6 +2127,170 @@ function renderRazao(){
   </div>`;
 }
 
+// ============================================================
+// PARSER DO RAZÃO (formato Domínio) — reconstrói linhas do PDF
+// a partir das posições dos itens de texto do pdf.js (que, ao
+// contrário do parsePDF genérico, não preserva colunas), depois
+// interpreta a estrutura real do relatório de Razão.
+// ============================================================
+function pdfItemsToLines(items){
+  const filtered=items.filter(it=>it.str&&it.str.trim()!=='');
+  const lines=[];
+  const tol=2;
+  for(const it of filtered){
+    const x=it.transform[4], y=it.transform[5];
+    let line=lines.find(l=>Math.abs(l.y-y)<tol);
+    if(!line){ line={y,items:[]}; lines.push(line); }
+    line.items.push({str:it.str,x,w:it.width||0});
+  }
+  lines.sort((a,b)=>b.y-a.y);
+  return lines.map(l=>{
+    l.items.sort((a,b)=>a.x-b.x);
+    let text='', lastEnd=null;
+    for(const it of l.items){
+      if(lastEnd!==null){
+        const gap=it.x-lastEnd;
+        if(gap>8) text+='   ';
+        else if(gap>1.2) text+=' ';
+      }
+      text+=it.str;
+      lastEnd=it.x+it.w;
+    }
+    return text;
+  });
+}
+
+async function extractRazaoPdfPages(buffer, onProgress){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+  const pages=[];
+  for(let p=1;p<=pdf.numPages;p++){
+    const page=await pdf.getPage(p);
+    const tc=await page.getTextContent();
+    pages.push(pdfItemsToLines(tc.items));
+    if(onProgress&&(p%10===0||p===pdf.numPages)) onProgress(p,pdf.numPages);
+  }
+  return pages;
+}
+
+const RE_RAZ_CONTA=/^Conta:\s+(\d+)\s*-\s*([\d.]+)\s+(.*)$/;
+const RE_RAZ_ENTRY=/^\s*(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(.*)$/;
+const RE_RAZ_TAIL2=/^(.*?)\s+([\d.]+,\d{2})([DC]?)\s+([\d.]+,\d{2})([DC]?)\s*$/;
+const RE_RAZ_MID=/^(.*?)\s+(?:(\d+)\s+)?([\d.]{1,15},\d{2})\s*$/;
+const RAZ_SKIP_STARTS=['Empresa:','C.N.P.J.:','Período:','Sistema licenciado','RAZÃO','Data ',' Data'];
+
+function razParseValor(s){ return parseFloat(s.replace(/\./g,'').replace(',','.')); }
+function razParseSaldo(n,s){ const v=razParseValor(n); return s==='C'?-v:v; }
+
+// Interpreta as linhas reconstruídas: primeiro mapeia código interno do
+// Domínio -> código hierárquico (via cabeçalhos "Conta:"), depois extrai
+// cada lançamento, inferindo se foi débito ou crédito NESTA conta pela
+// variação do saldo corrente (evita depender de alinhamento de coluna,
+// que se perde na extração de texto).
+function parseRazaoDominio(pages){
+  const mapa={};
+  for(const lines of pages) for(const raw of lines){
+    const m=RE_RAZ_CONTA.exec(raw.trim());
+    if(m) mapa[m[1]]=m[2];
+  }
+  const entries=[];
+  let curConta=null, curSaldo=null, pending=null;
+  const fechar=()=>{ if(pending){ entries.push(pending); pending=null; } };
+  for(const lines of pages){
+    for(const raw of lines){
+      const stripped=raw.trim();
+      if(!stripped) continue;
+      if(RAZ_SKIP_STARTS.some(s=>stripped.startsWith(s))) continue;
+      const mConta=RE_RAZ_CONTA.exec(stripped);
+      if(mConta){ fechar(); curConta=mConta[2]; curSaldo=null; continue; }
+      if(stripped.includes('SALDO ANTERIOR')){
+        fechar();
+        const m=/([\d.]+,\d{2})([DC]?)\s*$/.exec(stripped);
+        if(m) curSaldo=razParseSaldo(m[1],m[2]);
+        continue;
+      }
+      const mEntry=RE_RAZ_ENTRY.exec(stripped);
+      if(mEntry){
+        fechar();
+        const resto=mEntry[3];
+        const m2=RE_RAZ_TAIL2.exec(resto);
+        if(!m2) continue;
+        const [,meio,saldoN,saldoS]=m2;
+        const m3=RE_RAZ_MID.exec(meio);
+        if(!m3) continue;
+        const [,historico,ctacpart,valorStr]=m3;
+        const saldo=razParseSaldo(saldoN,saldoS);
+        const valor=razParseValor(valorStr);
+        let direcao=null;
+        if(curSaldo!==null){
+          const delta=saldo-curSaldo;
+          if(Math.abs(Math.abs(delta)-valor)<0.02) direcao=delta>0?'D':(delta<0?'C':null);
+        }
+        curSaldo=saldo;
+        pending={historico:historico.trim(),conta:curConta,ctacpartHier:mapa[ctacpart],valor,direcao};
+        continue;
+      }
+      if(pending) pending.historico+=' '+stripped;
+    }
+  }
+  fechar();
+  return entries;
+}
+
+// Extrai um "padrão" reconhecível do histórico: prioriza o nome que
+// aparece antes de um CNPJ/CPF (normalmente a contraparte real do
+// lançamento — cliente, fornecedor, etc.); sem isso, cai pra uma
+// versão limpa do início do texto.
+function extrairPadraoRazao(historico){
+  const mCnpj=historico.match(/(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/);
+  const mCpf=historico.match(/(\d{3}\.\d{3}\.\d{3}-\d{2})/);
+  const doc=mCnpj?mCnpj[1]:(mCpf?mCpf[1]:null);
+  if(doc){
+    const antes=historico.slice(0,historico.indexOf(doc)).trim();
+    const palavras=antes.split(/\s+/).filter(w=>w.length>1&&!/^[\d/.\-]+$/.test(w));
+    const nome=palavras.slice(-6).join(' ');
+    if(nome.length>=4) return nome.toLowerCase();
+  }
+  let t=historico.replace(/^VR\.?\s*REF\.?\s*/i,'').trim();
+  t=t.replace(/\b\d{1,4}\/\d{1,4}\b/g,'');
+  t=t.replace(/\s{2,}/g,' ').trim();
+  return t.slice(0,30).toLowerCase();
+}
+
+// Agrupa por padrão e usa a combinação (contaD,contaC) mais frequente pra
+// cada um — só considera lançamentos vistos a partir de uma conta bancária
+// cadastrada (senão captura também o "espelho" do lançamento visto do lado
+// do cliente/fornecedor, que não serve pra classificar extratos).
+function buildRegrasFromEntries(entries, empId, bancoCodigos){
+  const usaveis=entries.filter(e=>e.direcao&&e.ctacpartHier&&bancoCodigos.has(e.conta));
+  const porPadrao={};
+  for(const e of usaveis){
+    const pattern=extrairPadraoRazao(e.historico);
+    if(!pattern||pattern.length<3) continue;
+    const contaD=e.direcao==='D'?e.conta:e.ctacpartHier;
+    const contaC=e.direcao==='D'?e.ctacpartHier:e.conta;
+    if(!porPadrao[pattern]) porPadrao[pattern]={pattern,hist:e.historico.slice(0,80),pairs:{}};
+    const pk=contaD+'|'+contaC;
+    porPadrao[pattern].pairs[pk]=(porPadrao[pattern].pairs[pk]||0)+1;
+  }
+  const regras=[];
+  for(const key in porPadrao){
+    const info=porPadrao[key];
+    let bestPair=null, bestCount=0;
+    for(const pk in info.pairs) if(info.pairs[pk]>bestCount){ bestCount=info.pairs[pk]; bestPair=pk; }
+    const [contaD,contaC]=bestPair.split('|');
+    regras.push({empId,pattern:info.pattern,contaD,contaC,hist:info.hist,codHist:''});
+  }
+  return regras;
+}
+
+let _razaoAborted=false;
+function abortRazao(){
+  _razaoAborted=true;
+  const btn=document.getElementById('btnAbortRazao');
+  if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Parando...'; }
+}
+
 async function processRazao(file){
   if(!file)return;
   const empId=document.getElementById('razEmp').value;
@@ -2130,48 +2301,81 @@ async function processRazao(file){
     document.getElementById('razEmpWarn').textContent='Cliente novo — não é necessário importar razão.';
     return;
   }
-  st.innerHTML=`<div class="text-primary small"><i class="bi bi-hourglass-split me-1"></i>Processando razão...</div>`;
+  const tipo=document.getElementById('razTipo').value;
+  const wrap=document.getElementById('razProgressWrap');
+  const bar=document.getElementById('razProgressBar');
+  const txt=document.getElementById('razProgressTxt');
+  const abortBtn=document.getElementById('btnAbortRazao');
+  st.innerHTML='';
+  wrap.classList.remove('d-none');
+  bar.style.width='0%';
+  txt.textContent='Lendo arquivo...';
+  _razaoAborted=false;
   try{
     const buf=await file.arrayBuffer();
-    const tipo=document.getElementById('razTipo').value;
-    let rows=[];
-    if(tipo==='excel'){
+    let regras;
+    if(tipo==='pdf'){
+      const bancoCodigos=new Set(getBancos(empId).map(b=>b.contabil).filter(Boolean));
+      if(bancoCodigos.size===0){
+        wrap.classList.add('d-none');
+        toast('Cadastre ao menos um banco (com Conta Contábil vinculada) pra essa empresa antes de importar o razão em PDF — é assim que reconheço quais lançamentos são bancários.','danger');
+        return;
+      }
+      const pages=await extractRazaoPdfPages(buf,(p,total)=>{
+        bar.style.width=Math.round(p/total*60)+'%';
+        txt.textContent=`Lendo página ${p} de ${total}...`;
+      });
+      txt.textContent='Analisando lançamentos...';
+      const entries=parseRazaoDominio(pages);
+      regras=buildRegrasFromEntries(entries,empId,bancoCodigos);
+    } else {
       const wb=XLSX.read(new Uint8Array(buf),{type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
-      rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-    } else {
-      const res=await parsePDF(new Uint8Array(buf));
-      rows=res.rawText.split('\n').map(l=>[l]);
-    }
-    // Extract patterns: look for description + conta debito + conta credito
-    let learned=0, erros=0;
-    for(const row of rows){
-      if(!row||!row[0])continue;
-      // Try columns: hist/desc, contaD, contaC
-      const desc=String(row[0]||row[1]||'').trim();
-      const cd=String(row[2]||row[3]||'').trim();
-      const cc=String(row[3]||row[4]||'').trim();
-      if(desc.length>3&&cd.match(/\d+\.\d+/)&&cc.match(/\d+\.\d+/)){
-        const pattern=desc.slice(0,30).toLowerCase();
-        if(!DB.regras.find(r=>r.empId===empId&&r.pattern===pattern)){
-          const novaRegra={id:uid(),empId,pattern,contaD:cd,contaC:cc,hist:desc,codHist:''};
-          try{
-            await xlAddRow('Regras', regraToRow(novaRegra));
-            DB.regras.push(novaRegra);
-            learned++;
-          }catch(err){ erros++; console.error(err); }
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      regras=[];
+      for(const row of rows){
+        if(!row||!row[0])continue;
+        const desc=String(row[0]||row[1]||'').trim();
+        const cd=String(row[2]||row[3]||'').trim();
+        const cc=String(row[3]||row[4]||'').trim();
+        if(desc.length>3&&cd.match(/\d+\.\d+/)&&cc.match(/\d+\.\d+/)){
+          regras.push({empId,pattern:desc.slice(0,30).toLowerCase(),contaD:cd,contaC:cc,hist:desc,codHist:''});
         }
       }
     }
-    if(erros>0) toast(`${erros} regra(s) não puderam ser gravadas no Excel — veja o console.`,'danger');
+    const novas=regras.filter(r=>!DB.regras.find(x=>x.empId===empId&&x.pattern===r.pattern));
+    if(novas.length===0){
+      wrap.classList.add('d-none');
+      toast('Nenhuma regra nova encontrada (padrões já existentes ou nada reconhecível nesse arquivo).','warning');
+      return;
+    }
+    abortBtn.classList.remove('d-none');
+    let gravadas=0, erros=0;
+    for(const r of novas){
+      if(_razaoAborted) break;
+      r.id=uid();
+      try{ await xlAddRow('Regras', regraToRow(r)); DB.regras.push(r); gravadas++; }
+      catch(err){ erros++; console.error(err); }
+      const pct=60+Math.round((gravadas+erros)/novas.length*40);
+      bar.style.width=Math.min(pct,100)+'%';
+      txt.textContent=`Gravando regras... ${gravadas+erros}/${novas.length}`;
+    }
+    await closeWbSession();
+    wrap.classList.add('d-none');
+    abortBtn.classList.add('d-none');
     if(emp) emp.razaoImportada=true;
-    st.innerHTML=`<div class="text-success small"><i class="bi bi-check-circle me-1"></i>${learned} regras aprendidas de ${file.name}</div>`;
-    toast(`${learned} regras aprendidas do razão!`);
+    const msg=_razaoAborted
+      ? `Importação cancelada. ${gravadas} regra(s) gravada(s) antes de parar.`
+      : `${gravadas} regra(s) aprendida(s) do razão!${erros?` (${erros} erro(s) — veja o console)`:''}`;
+    st.innerHTML=`<div class="text-success small"><i class="bi bi-check-circle me-1"></i>${msg}</div>`;
+    toast(msg);
     go('razao');
   } catch(err){
+    wrap.classList.add('d-none');
     st.innerHTML=`<div class="text-danger small">Erro: ${err.message}</div>`;
   }
 }
+
 
 function handleRazDrop(e){
   e.preventDefault();
