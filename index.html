@@ -1559,6 +1559,9 @@ function renderLanc(){
       <button class="btn btn-outline-danger btn-sm d-none" id="btnDelSelected" onclick="delLancSelecionados()">
         <i class="bi bi-trash me-1"></i>Excluir selecionados (<span id="lancSelCount">0</span>)
       </button>
+      <button class="btn btn-outline-secondary btn-sm d-none" id="btnAbortDelLanc" onclick="abortDelLancSelecionados()">
+        <i class="bi bi-x-circle me-1"></i>Cancelar
+      </button>
     </div>
   </div>
     <div id="importProgressWrap2" class="px-2 pt-2 d-none">
@@ -1570,6 +1573,7 @@ function renderLanc(){
 }
 
 let _lancSelected=new Set();
+let _delLancAborted=false;
 
 function toggleLancSel(id,checked){
   if(checked) _lancSelected.add(id); else _lancSelected.delete(id);
@@ -1601,6 +1605,7 @@ async function delLancSelecionados(){
   if(!ids.length)return;
   if(!confirm(`Excluir ${ids.length} lançamento(s) selecionado(s)? Essa ação não pode ser desfeita.`))return;
   const btn=document.getElementById('btnDelSelected');
+  const abortBtn=document.getElementById('btnAbortDelLanc');
   const wrap=document.getElementById('importProgressWrap2');
   const bar=document.getElementById('importProgressBar2');
   const txt=document.getElementById('importProgressTxt2');
@@ -1608,22 +1613,41 @@ async function delLancSelecionados(){
   btn.disabled=true;
   btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Excluindo...';
   wrap.classList.remove('d-none');
+  _delLancAborted=false;
+  abortBtn.classList.remove('d-none');
+  abortBtn.disabled=false;
+  abortBtn.innerHTML='<i class="bi bi-x-circle me-1"></i>Cancelar';
   let erros=0, feitos=0;
   for(const id of ids){
+    if(_delLancAborted) break;
     try{ await xlDeleteRowById('Lancamentos', id); }
     catch(err){ erros++; console.error(err); feitos++; continue; }
     DB.lancamentos=DB.lancamentos.filter(l=>l.id!==id);
+    _lancSelected.delete(id);
     feitos++;
     const pct=Math.round(feitos/ids.length*100);
     bar.style.width=pct+'%';
     txt.textContent=`Excluindo ${feitos} de ${ids.length}...`;
   }
   wrap.classList.add('d-none');
+  abortBtn.classList.add('d-none');
   btn.disabled=false; btn.innerHTML=btnOrig;
-  _lancSelected.clear();
-  if(erros>0) toast(`${erros} lançamento(s) não puderam ser excluídos — veja o console.`,'danger');
-  else toast(`${feitos} lançamento(s) excluído(s)!`,'warning');
+  if(_delLancAborted){
+    // mantém selecionados os que ainda não foram excluídos, pra poder continuar depois
+    toast(`Exclusão cancelada. ${feitos} de ${ids.length} excluídos antes de parar.`,'warning');
+  } else {
+    _lancSelected.clear();
+    if(erros>0) toast(`${erros} lançamento(s) não puderam ser excluídos — veja o console.`,'danger');
+    else toast(`${feitos} lançamento(s) excluído(s)!`,'warning');
+  }
   renderLancTable();
+}
+
+function abortDelLancSelecionados(){
+  _delLancAborted=true;
+  const abortBtn=document.getElementById('btnAbortDelLanc');
+  abortBtn.disabled=true;
+  abortBtn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Parando...';
 }
 
 function renderLancTable(){
