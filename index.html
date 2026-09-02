@@ -585,6 +585,7 @@ let _classQueue = [];       // unclassified transactions queue
 let _classIdx = 0;          // current index in queue
 let _classEmpId = null;     // empresa context for classification
 let _importPreview = [];    // parsed transactions for preview
+let _importAborted = false; // true quando o usuário clica em "Cancelar" durante o lançamento
 let _lastImportIds = [];    // ids dos lançamentos criados na última importação (pra poder cancelar)
 let _lastImportMeta = null; // {empNome, ts}
 let _importEmpId = null;
@@ -1330,6 +1331,9 @@ function renderImport(){
         <div class="dth"><h5>3. Prévia das Transações</h5>
           <div class="d-flex gap-2">
             <span id="previewCount" class="badge bg-secondary">0 transações</span>
+            <button class="btn btn-outline-danger btn-sm d-none" id="btnAbortImport" onclick="abortImport()">
+              <i class="bi bi-x-circle me-1"></i>Cancelar
+            </button>
             <button class="btn btn-success btn-sm" id="btnConfirmar" onclick="confirmarImport()" style="display:none">
               <i class="bi bi-check-lg me-1"></i>Confirmar e Lançar
             </button>
@@ -1462,6 +1466,7 @@ async function confirmarImport(){
   // Add classified ones to lancamentos
   const classified=_importPreview.filter(t=>t.contaD&&t.contaC);
   const btn=document.getElementById('btnConfirmar');
+  const abortBtn=document.getElementById('btnAbortImport');
   const wrap=document.getElementById('importProgressWrap');
   const bar=document.getElementById('importProgressBar');
   const txt=document.getElementById('importProgressTxt');
@@ -1469,10 +1474,15 @@ async function confirmarImport(){
   btn.disabled=true;
   btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Lançando...';
   wrap.classList.remove('d-none');
+  _importAborted=false;
+  abortBtn.classList.remove('d-none');
+  abortBtn.disabled=false;
+  abortBtn.innerHTML='<i class="bi bi-x-circle me-1"></i>Cancelar';
   let erros=0, feitos=0;
   // Nova importação: reseta o rastreamento de "cancelar importação"
   _lastImportIds=[]; _lastImportMeta={empNome:(getEmp(empId)||{}).nome||'', ts:new Date()};
   for(const t of classified){
+    if(_importAborted) break;
     const novo={
       id:uid(),empId,bancoId,data:t.data,
       contaD:t.contaD,contaC:t.contaC,
@@ -1491,7 +1501,14 @@ async function confirmarImport(){
     txt.textContent=`Lançando ${feitos} de ${classified.length}...`;
   }
   wrap.classList.add('d-none');
+  abortBtn.classList.add('d-none');
   btn.disabled=false; btn.innerHTML=btnOrig;
+  if(_importAborted){
+    toast(`Importação cancelada. ${feitos} de ${classified.length} lançados antes de parar.`,'warning');
+    _importPreview=_importPreview.filter(t=>!classified.slice(0,feitos).includes(t));
+    go('lanc');
+    return;
+  }
   if(erros>0) toast(`${erros} lançamento(s) não puderam ser gravados no Excel — veja o console.`,'danger');
   if(unclass.length>0){
     _classQueue=unclass; _classIdx=0; _classEmpId=empId;
@@ -1502,6 +1519,13 @@ async function confirmarImport(){
     _importPreview=[];
     go('lanc');
   }
+}
+
+function abortImport(){
+  _importAborted=true;
+  const abortBtn=document.getElementById('btnAbortImport');
+  abortBtn.disabled=true;
+  abortBtn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Parando...';
 }
 
 // ============================================================
