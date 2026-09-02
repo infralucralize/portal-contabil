@@ -412,6 +412,21 @@ async function xlUpdateRowById(table, id, obj){
   await graph('PATCH', `/drives/${_driveId}/items/${_wbItemId}/workbook/tables/Tbl${table}/rows/itemAt(index=${row._rowIndex})`, {values:[values]});
 }
 
+// Como update: se a linha não existir mais na planilha (ex: foi apagada
+// manualmente ou o estado local ficou desatualizado), recria a linha em
+// vez de falhar — evita erros de "linha não encontrada" no dia a dia.
+async function xlUpsertRowById(table, id, obj){
+  try{
+    await xlUpdateRowById(table, id, obj);
+  }catch(err){
+    if(String(err.message).includes('não encontrada')){
+      await xlAddRow(table, obj);
+    } else {
+      throw err;
+    }
+  }
+}
+
 async function xlDeleteRowById(table, id){
   const rows = await xlGetRows(table);
   const row = rows.find(r=>String(r.Id)===String(id));
@@ -1526,7 +1541,7 @@ async function saveLanc(){
       const l=DB.lancamentos.find(x=>x.id===editId);
       if(!l){toast('Lançamento não encontrado','danger');return;}
       Object.assign(l,campos);
-      await xlUpdateRowById('Lancamentos', editId, lancToRow(l));
+      await xlUpsertRowById('Lancamentos', editId, lancToRow(l));
     } else {
       const novo={id:uid(),...campos,conciliado:false};
       await xlAddRow('Lancamentos', lancToRow(novo));
@@ -1916,7 +1931,7 @@ async function saveTpl(){
   _tplEdit.nome=nome; _tplEdit.descricao=desc||'';
   const idx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
   try{
-    if(idx>=0) await xlUpdateRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit));
+    if(idx>=0) await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit));
     else await xlAddRow('PlanoContas', tplToRow(_tplEdit));
   }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   if(idx>=0) DB.templates[idx]=_tplEdit;
@@ -1980,7 +1995,7 @@ async function saveConta(){
   else _tplEdit.contas.push(c);
   // Sort by codigo
   _tplEdit.contas.sort((a,b)=>a.codigo.localeCompare(b.codigo));
-  try{ await xlUpdateRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
+  try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
   catch(err){ _tplEdit.contas=backup; toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   const tplIdx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
   if(tplIdx>=0) DB.templates[tplIdx]=_tplEdit;
@@ -1993,7 +2008,7 @@ async function delConta(idx){
   if(!_tplEdit||!confirm('Excluir esta conta?'))return;
   const backup=_tplEdit.contas.slice();
   _tplEdit.contas.splice(idx,1);
-  try{ await xlUpdateRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
+  try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
   catch(err){ _tplEdit.contas=backup; toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
   const tplIdx=DB.templates.findIndex(t=>t.id===_tplEdit.id);
   if(tplIdx>=0) DB.templates[tplIdx]=_tplEdit;
@@ -2026,7 +2041,7 @@ async function saveEmp(id,mode){
     razaoImportada:false
   };
   try{
-    if(mode==='edit') await xlUpdateRowById('Empresas', id, empToRow(data));
+    if(mode==='edit') await xlUpsertRowById('Empresas', id, empToRow(data));
     else await xlAddRow('Empresas', empToRow(data));
   }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   if(mode==='edit'){
@@ -2103,7 +2118,7 @@ async function saveBanco(){
     dataSaldo:document.getElementById('mbDataSaldo').value
   };
   try{
-    if(existente) await xlUpdateRowById('Bancos', id, bancoToRow(data));
+    if(existente) await xlUpsertRowById('Bancos', id, bancoToRow(data));
     else await xlAddRow('Bancos', bancoToRow(data));
   }catch(err){ toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   const idx=DB.bancos.findIndex(b=>b.id===id);
@@ -2197,7 +2212,7 @@ async function saveClass(){
       const l=DB.lancamentos.find(l=>l.id===txn.id);
       if(l){
         l.contaD=contaD;l.contaC=contaC;l.hist=hist;l.codHist=codHist;l.doc=doc;l.conciliado=true;
-        await xlUpdateRowById('Lancamentos', l.id, lancToRow(l));
+        await xlUpsertRowById('Lancamentos', l.id, lancToRow(l));
       }
     } else {
       const novo={
