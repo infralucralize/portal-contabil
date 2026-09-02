@@ -390,6 +390,7 @@ async function resolveWorkbook(){
     _wbSessionId = session.id;
   }catch(err){
     console.error('Não foi possível abrir sessão persistente do Excel, seguindo sem ela:', err);
+    toast('Aviso: não consegui abrir uma sessão persistente no Excel (' + err.message + '). Gravações podem não ser salvas de forma confiável — evite excluir vários itens em sequência até resolvermos isso.', 'danger');
   }
 }
 
@@ -2534,10 +2535,5 @@ if(typeof pdfjsLib!=='undefined'){
 }
 
 trySilentLogin();
-
-// Auto-refresh lancamentos table when visible
-setInterval(()=>{
-  if(_view==='lanc') renderLancTable();
-},5000);
 </script>
 </body></html>
