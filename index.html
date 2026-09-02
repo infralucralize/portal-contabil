@@ -195,8 +195,15 @@ a,.login-link{color:var(--pr)}
           <div class="col-4"><label class="form-label">Nível</label>
             <select id="mcNiv" class="form-select">
               <option value="1">1-Grupo</option><option value="2">2-Subgrupo</option>
-              <option value="3">3-Elemento</option><option value="4" selected>4-Analítica</option>
+              <option value="3">3-Elemento</option><option value="4" selected>4-Subelemento</option>
+              <option value="5">5-Analítica</option>
             </select>
+          </div>
+          <div class="col-4 d-flex align-items-end">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="mcAceita" checked>
+              <label class="form-check-label" for="mcAceita">Aceita lançamento (analítica)</label>
+            </div>
           </div>
           <div class="col-8"><label class="form-label">Histórico Padrão</label><input type="text" id="mcHP" class="form-control" placeholder="Ex: Movimentação bancária"></div>
           <div class="col-4"><label class="form-label">Cód. Histórico</label><input type="number" id="mcCH" class="form-control" placeholder="2"></div>
@@ -713,7 +720,7 @@ const getBancos = empId => DB.bancos.filter(b=>b.empId===empId);
 function getContasAnaliticas(empId){
   const emp=getEmp(empId); if(!emp)return[];
   const tpl=getTpl(emp.planoId); if(!tpl)return[];
-  return tpl.contas.filter(c=>c.nivel==4&&c.aceita);
+  return tpl.contas.filter(c=>c.aceita);
 }
 
 function autoClassify(txn, empId){
@@ -1043,7 +1050,7 @@ function renderPlano(){
             </div>
             <div style="max-height:180px;overflow-y:auto">
               ${t.contas.slice(0,12).map(c=>`
-                <div class="tree-row ${c.nivel==4?'l4':''}" style="padding-left:${(c.nivel-1)*14}px">
+                <div class="tree-row ${c.aceita?'l4':''}" style="padding-left:${(c.nivel-1)*14}px">
                   <span class="badge-${c.natureza} me-1">${c.natureza}</span>
                   <span class="text-muted me-1" style="font-size:.72rem">${c.codigo}</span>
                   <span style="font-size:.8rem">${c.nome}</span>
@@ -1118,7 +1125,7 @@ function renderContasRows(){
   return _tplEdit.contas.map((c,i)=>`
     <tr style="padding-left:${(c.nivel-1)*12}px">
       <td><small>${c.codigo}</small></td>
-      <td style="padding-left:${(c.nivel-1)*12}px"><small ${c.nivel==4?'class="fw-semibold"':'class="text-muted"'}>${c.nome}</small></td>
+      <td style="padding-left:${(c.nivel-1)*12}px"><small ${c.aceita?'class="fw-semibold"':'class="text-muted"'}>${c.nome}</small></td>
       <td><small>${c.tipo}</small></td>
       <td><span class="badge-${c.natureza}">${c.natureza}</span></td>
       <td><small>${c.nivel}</small></td>
@@ -2401,11 +2408,13 @@ function openContaModal(idx){
     document.getElementById('mcTipo').value=c.tipo;
     document.getElementById('mcNat').value=c.natureza;
     document.getElementById('mcNiv').value=c.nivel;
+    document.getElementById('mcAceita').checked=!!c.aceita;
     document.getElementById('mcHP').value=c.hp||'';
     document.getElementById('mcCH').value=c.ch||'';
   } else {
     ['mcCod','mcNome','mcHP','mcCH'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('mcNiv').value='4';
+    document.getElementById('mcAceita').checked=true;
   }
   new bootstrap.Modal(document.getElementById('mConta')).show();
 }
@@ -2420,7 +2429,7 @@ async function saveConta(){
     tipo:document.getElementById('mcTipo').value,
     natureza:document.getElementById('mcNat').value,
     nivel:parseInt(document.getElementById('mcNiv').value),
-    aceita:parseInt(document.getElementById('mcNiv').value)===4,
+    aceita:document.getElementById('mcAceita').checked,
     hp:document.getElementById('mcHP').value.trim(),
     ch:parseInt(document.getElementById('mcCH').value)||0,
     id: idx>=0 ? _tplEdit.contas[idx].id : uid()
