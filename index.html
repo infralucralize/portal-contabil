@@ -384,16 +384,34 @@ async function graphRaw(method, path, arrayBuffer, contentType){
 }
 
 async function resolveWorkbook(){
-  if(_wbItemId) return;
-  _driveId = SP_CONFIG.driveId;
-  const item = await graph('GET', `/drives/${_driveId}/root:/${encPath(SP_CONFIG.workbookPath)}`);
-  _wbItemId = item.id;
+  if(_wbItemId && _wbSessionId) return;
+  if(!_wbItemId){
+    _driveId = SP_CONFIG.driveId;
+    const item = await graph('GET', `/drives/${_driveId}/root:/${encPath(SP_CONFIG.workbookPath)}`);
+    _wbItemId = item.id;
+  }
+  if(!_wbSessionId){
+    try{
+      const session = await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/createSession`, {persistChanges:true});
+      _wbSessionId = session.id;
+    }catch(err){
+      console.error('Não foi possível abrir sessão persistente do Excel, seguindo sem ela:', err);
+      toast('Aviso: não consegui abrir uma sessão persistente no Excel (' + err.message + '). Gravações podem não ser salvas de forma confiável.', 'danger');
+    }
+  }
+}
+
+// Fecha a sessão do Excel — força o Excel a "confirmar de vez" as mudanças
+// feitas durante a sessão. Chamado ao final de cada operação de gravação;
+// a próxima operação abre uma sessão nova automaticamente.
+async function closeWbSession(){
+  if(!_wbSessionId) return;
+  const sid=_wbSessionId;
+  _wbSessionId=null; // já libera pra próxima operação abrir sessão nova, mesmo se o close falhar
   try{
-    const session = await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/createSession`, {persistChanges:true});
-    _wbSessionId = session.id;
+    await graph('POST', `/drives/${_driveId}/items/${_wbItemId}/workbook/closeSession`, undefined, {'workbook-session-id':sid});
   }catch(err){
-    console.error('Não foi possível abrir sessão persistente do Excel, seguindo sem ela:', err);
-    toast('Aviso: não consegui abrir uma sessão persistente no Excel (' + err.message + '). Gravações podem não ser salvas de forma confiável — evite excluir vários itens em sequência até resolvermos isso.', 'danger');
+    console.error('Erro ao fechar sessão do Excel:', err);
   }
 }
 
@@ -1294,6 +1312,7 @@ async function cancelarUltimaImportacao(){
     if(txt) txt.textContent=`Cancelando ${feitos} de ${total}...`;
   }
   wrap?.classList.add('d-none');
+  await closeWbSession();
   _lastImportIds=[]; _lastImportMeta=null;
   if(erros>0) toast(`${erros} lançamento(s) não puderam ser excluídos — veja o console.`,'danger');
   else toast('Importação cancelada com sucesso!','warning');
@@ -1520,6 +1539,7 @@ async function confirmarImport(){
   abortBtn.classList.add('d-none');
   btn.disabled=false; btn.innerHTML=btnOrig;
   if(_importAborted){
+    await closeWbSession();
     toast(`Importação cancelada. ${feitos} de ${classified.length} lançados antes de parar.`,'warning');
     _importPreview=_importPreview.filter(t=>!classified.slice(0,feitos).includes(t));
     go('lanc');
@@ -1531,6 +1551,7 @@ async function confirmarImport(){
     toast(`${classified.length-erros} lançados. Classificando ${unclass.length} não identificados...`,'warning');
     openClassModal();
   } else {
+    await closeWbSession();
     toast(`${classified.length-erros} lançamentos registrados com sucesso!`);
     _importPreview=[];
     go('lanc');
@@ -1648,6 +1669,7 @@ async function delLancSelecionados(){
   wrap.classList.add('d-none');
   abortBtn.classList.add('d-none');
   btn.disabled=false; btn.innerHTML=btnOrig;
+  await closeWbSession();
   if(_delLancAborted){
     // mantém selecionados os que ainda não foram excluídos, pra poder continuar depois
     toast(`Exclusão cancelada. ${feitos} de ${ids.length} excluídos antes de parar.`,'warning');
@@ -1788,6 +1810,7 @@ async function saveLanc(){
       DB.lancamentos.push(novo);
     }
   } catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   lock.restore();
   bootstrap.Modal.getInstance(document.getElementById('mLanc'))?.hide();
   toast(editId?'Lançamento atualizado!':'Lançamento registrado!');
@@ -1797,6 +1820,7 @@ async function saveLanc(){
 async function delLanc(id){
   if(!confirm('Excluir este lançamento?'))return;
   try{ await xlDeleteRowById('Lancamentos', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   DB.lancamentos=DB.lancamentos.filter(l=>l.id!==id);
   renderLancTable();
   toast('Lançamento excluído','warning');
@@ -2059,6 +2083,7 @@ function handleRazDrop(e){
 async function delRegra(i){
   const reg=DB.regras[i];
   if(reg){ try{ await xlDeleteRowById('Regras', reg.id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; } }
+  await closeWbSession();
   DB.regras.splice(i,1);
   go('razao');
   toast('Regra removida','warning');
@@ -2195,6 +2220,7 @@ async function saveTpl(){
     upsertLocalTpl();
   }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
+  await closeWbSession();
   lock.restore();
   toast('Template salvo!');
   go('plano');
@@ -2204,6 +2230,7 @@ async function delTpl(id){
   if(DB.empresas.some(e=>e.planoId===id)){toast('Não é possível excluir: template vinculado a empresas','danger');return;}
   if(!confirm('Excluir este template?'))return;
   try{ await xlDeleteRowById('PlanoContas', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   DB.templates=DB.templates.filter(t=>t.id!==id);
   toast('Template excluído','warning');
   go('plano');
@@ -2262,6 +2289,7 @@ async function saveConta(){
   try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
   catch(err){ _tplEdit.contas=backup; lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
+  await closeWbSession();
   lock.restore();
   upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
@@ -2279,6 +2307,7 @@ async function delConta(idx){
   try{ await xlUpsertRowById('PlanoContas', _tplEdit.id, tplToRow(_tplEdit)); }
   catch(err){ _tplEdit.contas=backup; toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
   finally{ _tplBusy=false; }
+  await closeWbSession();
   upsertLocalTpl();
   document.getElementById('contasBody').innerHTML=renderContasRows();
   toast('Conta excluída','warning');
@@ -2313,6 +2342,7 @@ async function saveEmp(id,mode){
     if(mode==='edit') await xlUpsertRowById('Empresas', id, empToRow(data));
     else await xlAddRow('Empresas', empToRow(data));
   }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   lock.restore();
   if(mode==='edit'){
     const e=getEmp(id);
@@ -2332,6 +2362,7 @@ async function delEmp(id){
     for(const r of DB.regras.filter(x=>x.empId===id)) await xlDeleteRowById('Regras', r.id);
     await xlDeleteRowById('Empresas', id);
   }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   DB.empresas=DB.empresas.filter(e=>e.id!==id);
   DB.bancos=DB.bancos.filter(b=>b.empId!==id);
   DB.lancamentos=DB.lancamentos.filter(l=>l.empId!==id);
@@ -2392,6 +2423,7 @@ async function saveBanco(){
     if(existente) await xlUpsertRowById('Bancos', id, bancoToRow(data));
     else await xlAddRow('Bancos', bancoToRow(data));
   }catch(err){ lock.restore(); toast('Erro ao salvar no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   lock.restore();
   const idx=DB.bancos.findIndex(b=>b.id===id);
   if(idx>=0) DB.bancos[idx]=data; else DB.bancos.push(data);
@@ -2403,6 +2435,7 @@ async function saveBanco(){
 async function delBanco(id,empId){
   if(!confirm('Excluir este banco?'))return;
   try{ await xlDeleteRowById('Bancos', id); }catch(err){ toast('Erro ao excluir no Excel: '+err.message,'danger'); return; }
+  await closeWbSession();
   DB.bancos=DB.bancos.filter(b=>b.id!==id);
   toast('Banco excluído','warning');
   go('emp-det',{id:empId});
@@ -2421,9 +2454,10 @@ function openClassModal(){
   _classModalInst.show();
 }
 
-function fillClassModal(){
+async function fillClassModal(){
   if(_classIdx>=_classQueue.length){
     _classModalInst?.hide();
+    await closeWbSession();
     toast(`Todas as classificações concluídas! ${_classQueue.length} lançamentos processados.`);
     go('lanc');
     return;
@@ -2519,10 +2553,11 @@ async function saveClass(){
   fillClassModal();
 }
 
-function skipClass(){
+async function skipClass(){
   _classIdx++;
   if(_classIdx>=_classQueue.length){
     _classModalInst?.hide();
+    await closeWbSession();
     toast(`Classificação encerrada. ${_classIdx} itens processados.`,'warning');
     go('lanc');
   } else {
