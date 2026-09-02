@@ -585,6 +585,8 @@ let _classQueue = [];       // unclassified transactions queue
 let _classIdx = 0;          // current index in queue
 let _classEmpId = null;     // empresa context for classification
 let _importPreview = [];    // parsed transactions for preview
+let _lastImportIds = [];    // ids dos lançamentos criados na última importação (pra poder cancelar)
+let _lastImportMeta = null; // {empNome, ts}
 let _importEmpId = null;
 let _importBancoId = null;
 
@@ -1241,10 +1243,51 @@ function renderEmpDet(state){
 // ============================================================
 // VIEW: IMPORTAÇÃO
 // ============================================================
+function renderLastImportBannerHtml(){
+  if(!_lastImportIds.length||!_lastImportMeta) return '';
+  return `<div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3">
+    <div><i class="bi bi-exclamation-triangle me-1"></i>
+      Última importação: <strong>${_lastImportIds.length} lançamento(s)</strong> em <strong>${_lastImportMeta.empNome}</strong>
+      <small class="text-muted ms-1">(${_lastImportMeta.ts.toLocaleString('pt-BR')})</small>
+    </div>
+    <button class="btn btn-outline-danger btn-sm" id="btnCancelImport" onclick="cancelarUltimaImportacao()">
+      <i class="bi bi-x-circle me-1"></i>Cancelar importação
+    </button>
+  </div>`;
+}
+
+async function cancelarUltimaImportacao(){
+  if(!_lastImportIds.length)return;
+  if(!confirm(`Excluir ${_lastImportIds.length} lançamento(s) dessa importação? Essa ação não pode ser desfeita.`))return;
+  const btn=document.getElementById('btnCancelImport');
+  const wrap=document.getElementById('importProgressWrap');
+  const bar=document.getElementById('importProgressBar');
+  const txt=document.getElementById('importProgressTxt');
+  const btnOrig=btn.innerHTML;
+  btn.disabled=true; btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Cancelando...';
+  wrap?.classList.remove('d-none');
+  let erros=0, feitos=0;
+  const total=_lastImportIds.length;
+  for(const id of _lastImportIds.slice()){
+    try{ await xlDeleteRowById('Lancamentos', id); }
+    catch(err){ erros++; console.error(err); feitos++; continue; }
+    DB.lancamentos=DB.lancamentos.filter(l=>l.id!==id);
+    feitos++;
+    if(bar){ const pct=Math.round(feitos/total*100); bar.style.width=pct+'%'; }
+    if(txt) txt.textContent=`Cancelando ${feitos} de ${total}...`;
+  }
+  wrap?.classList.add('d-none');
+  _lastImportIds=[]; _lastImportMeta=null;
+  if(erros>0) toast(`${erros} lançamento(s) não puderam ser excluídos — veja o console.`,'danger');
+  else toast('Importação cancelada com sucesso!','warning');
+  go('import');
+}
+
 function renderImport(){
   const empOpts=DB.empresas.map(e=>`<option value="${e.id}">${e.nome}</option>`).join('');
   return`
   <div class="ph"><div><h2>📥 Importação de Extratos</h2><p>Importe OFX, Excel ou PDF de um ou mais bancos</p></div></div>
+  <div id="lastImportBanner">${renderLastImportBannerHtml()}</div>
   <div class="row g-3">
     <div class="col-md-5">
       <div class="sc mb-3">
@@ -1427,6 +1470,8 @@ async function confirmarImport(){
   btn.innerHTML='<span class="spinner-border spinner-border-sm me-1"></span>Lançando...';
   wrap.classList.remove('d-none');
   let erros=0, feitos=0;
+  // Nova importação: reseta o rastreamento de "cancelar importação"
+  _lastImportIds=[]; _lastImportMeta={empNome:(getEmp(empId)||{}).nome||'', ts:new Date()};
   for(const t of classified){
     const novo={
       id:uid(),empId,bancoId,data:t.data,
@@ -1439,6 +1484,7 @@ async function confirmarImport(){
     catch(err){ erros++; console.error(err); feitos++; continue; }
     DB.lancamentos.push(novo);
     DB.movimentos.push({...t,empId,bancoId});
+    _lastImportIds.push(novo.id);
     feitos++;
     const pct=Math.round(feitos/classified.length*100);
     bar.style.width=pct+'%';
@@ -2314,6 +2360,7 @@ async function saveClass(){
       };
       await xlAddRow('Lancamentos', lancToRow(novo));
       DB.lancamentos.push(novo);
+      if(!txn._isLanc) _lastImportIds.push(novo.id);
     }
     // Salva regra
     if(salvar&&txn.descricao){
